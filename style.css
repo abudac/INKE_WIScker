@@ -1,0 +1,204 @@
+/*	*************************************************************************************************
+ *	Created by Andrea Budac at the University of Alberta
+ *	Created under the INKE project and Dr. Rockwell and Dr. Ruecker
+ *	Original idea by Robert Budac
+ *	Contributors: Andrea Budac, Geoffrey Rockwell, Zachary Palmer, Robert Budac, Stan Ruecker
+ *	*************************************************************************************************
+ *	WIkcer (Wikipedia Idea Scraper) is a tool for scraping old revisions of Wikipedia articles.
+ *	The corpus resulting from the scrape is then available to the user to analyze as they see fit.
+ *	
+ *	Copyright (C) 2014-2015  Andrea Budac and INKE
+ *	
+ *	This program is free software: you can redistribute it and/or modify
+ *	it under the terms of the GNU General Public License as published by
+ *	the Free Software Foundation, either version 3 of the License, or
+ *	(at your option) any later version.
+ *	
+ *	This program is distributed in the hope that it will be useful,
+ *	but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *	GNU General Public License for more details.
+ *	
+ *	You should have received a copy of the GNU General Public License
+ *	along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *	*************************************************************************************************
+ */
+
+/*
+ *	Element Section Tags
+ */
+
+/* Removes all auto formatting */
+* {
+	padding: 0;
+	margin: 0;
+}
+
+body {
+	font-family: Helvetica, sans-serif;
+}
+
+/*
+ *	IDs
+ */
+#printOutHere {
+	/* Make this box set height and scrollable */
+	overflow: auto;
+	height: 32em;
+}
+
+#previewFrame {
+	width: 100%;
+	height: 32em;
+}
+
+#aboutInfo {
+	font-size: 0.6em;
+	color: #55A156;
+	margin-right: 0.4%;
+	margin-left: 2%;
+	cursor: pointer;
+}
+
+#helpInfo {
+	font-size: 0.6em;
+	color: #55A156;
+	margin-left: 0.4%;
+	cursor: pointer;
+}
+
+#aboutPanel {
+	display: none;
+	overflow: hidden;
+}
+
+#helpPanel {
+	display: none;
+	overflow: hidden;
+}
+
+#progressBar {
+	width: 0%;
+}
+
+#progressBarWrapper {
+	display: none;
+}
+
+#errorOutputAlert {
+	display: none;
+}
+
+/* 
+ *	Classes
+ *	Contains position and decoration
+ */
+.mainTitle {
+	font-family: Georgia, serif;
+	width: 90%;
+	font-size: 2.2em;
+	color: #3B703C;
+	font-weight: 500;
+	margin-left: 5%;
+	margin-right: 5%;
+	margin-top: 1.2%;
+	margin-bottom: 1.4%;
+}
+
+.uALogo img {
+	max-height: 1.6em;
+}
+
+.iNKELogo img {
+	max-height: 2.6em;
+}
+
+.uALogo {
+	display: inline-block;
+	position: absolute;
+	right: 0px;
+	top: 14px;
+	margin-right: 2.8em;
+}
+
+.iNKELogo {
+	display: inline-block;
+	position: absolute;
+	right: 0px;
+	top: 2px;
+	margin-right: 11em;
+}
+
+.btn {
+	margin-top: 8px;
+}
+
+.infoPanel {
+	text-align: left;
+	color: #224022;
+	width: 90%;
+	margin-left: 5%;
+}
+
+.wikiFormLeft {
+	float: left;
+	width: 20%; /* 20%, 24em */
+	/* Interior Padding */
+	padding-left: 3%;
+	padding-right: 3%;
+	padding-top: 2%;
+	padding-bottom: 2%;
+	/* Exterior Padding */
+	margin-left: 5%;
+	margin-top: 1%;
+	margin-bottom: 1%;
+	/* Dropshadow */
+	-webkit-box-shadow: 0px 3px 10px rgba(50, 50, 50, 0.69);
+	-moz-box-shadow:    0px 3px 10px rgba(50, 50, 50, 0.69);
+	box-shadow:         0px 3px 10px rgba(50, 50, 50, 0.69);
+	background-color: #FFFFFF;
+}
+
+.wikiOutputRight {
+	float: right;
+	width: 66.666666%; /* 66.666666%, 80em */
+	height: auto;
+	/* Interior Padding */
+	padding-left: 3%;
+	padding-right: 3%;
+	padding-top: 2%;
+	padding-bottom: 2%;
+	/* Exterior Padding */
+	margin-right: 5%;
+	margin-top: 1%;
+	margin-bottom: 1%;
+	/* Dropshadow */
+	-webkit-box-shadow: 0px 3px 10px rgba(50, 50, 50, 0.69);
+	-moz-box-shadow:    0px 3px 10px rgba(50, 50, 50, 0.69);
+	box-shadow:         0px 3px 10px rgba(50, 50, 50, 0.69);
+	background-color: #FFFFFF;
+}
+
+.mainFormAndOutput {
+	display: inline;
+	overflow: auto;
+}
+
+/* Change the style of the popover to match Bootstrap button-danger style */
+.popover, .popover-content {
+	color: #A94442;
+	background-color: #F2DEDE;
+	border-color: #A94442 !important;
+	background-image: -webkit-linear-gradient(top, #F2DEDE 0%, #E7C3C3 100%);
+	background-image: linear-gradient(to bottom, #F2DEDE 0%, #E7C3C3 100%);
+	background-repeat: repeat-x;
+	filter: progid:DXImageTransform.Microsoft.gradient(startColorstr='#fff2dede', endColorstr='#ffe7c3c3', GradientType=0);
+}
+
+/*	Since each arrow (arrow that appears if the popover is
+ *	top, bottom, left or right) needs to be formatted
+ *	individually, change the style of only the one we are using
+ */
+.popover.right > .arrow:after {
+	border-right-color: #A94442 !important;
+}
