@@ -1,4 +1,10 @@
 <!DOCTYPE HTML>
+<html>
+<head>
+	<meta charset=utf-8>
+	<title>WIcker (Wikipedia Idea scraper)</title>
+	<meta name="description" content="Wikipedia Scraper">
+	<meta name="author" content="abudac">
 <!-- ============================================================================================== -->
 <!-- Created by Andrea Budac at the University of Alberta 										  	-->
 <!-- Created under the INKE project and Dr. Rockwell and Dr. Ruecker 							  	-->
@@ -23,12 +29,6 @@
 <!-- You should have received a copy of the GNU General Public License 								-->
 <!-- along with this program.  If not, see <http://www.gnu.org/licenses/>.							-->
 <!-- ============================================================================================== -->
-<html>
-<head>
-	<meta charset=utf-8>
-	<title>WIcker (Wikipedia Idea scraper)</title>
-	<meta name="description" content="Wikipedia Scraper">
-	<meta name="author" content="abudac">
 	<!-- CSS loaded from style.css -->
 	<link rel="stylesheet" type="text/css" href="style.css">
 	<!-- Bootstrap CSS -->
@@ -48,8 +48,10 @@
 	<span id="aboutInfo">About</span>
 	<span id="helpInfo">Instructions</span>
 	<!-- Images that link to their respective sites -->
-	<div class="iNKELogo"><a href="http://inke.ca/" target="_blank"><img src="img/inke_logo.png"> </a> </div>
-	<div class="uALogo"><a href="http://www.ualberta.ca/" target="_blank"> <img src="img/ua-color.png"> </a> </div>
+	<div class="iNKELogo"><a href="http://inke.ca/" target="_blank"><img src="img/inke_logo.png"
+		alt="Logo for the INKE group that links to INKE's website"> </a> </div>
+	<div class="uALogo"><a href="http://www.ualberta.ca/" target="_blank"> <img src="img/ua-color.png"
+		alt="Logo for the University of Alberta that links to the university's main website"> </a> </div>
 </header>
 <!-- Section for About and Instructions -->
 <section class="infoPanel" id="aboutPanel">
@@ -60,21 +62,20 @@
 	WIcker was created at the University of Alberta under the INKE project.
 </section>
 <section class="infoPanel" id="helpPanel">
-	In order to scape an article, copy the URL of the Wikipedia article you would like to scrape directly into this form, 
+	<p>In order to scape an article, copy the URL of the Wikipedia article you would like to scrape directly into this form, 
 	then enter the interval of time that you would like the article to be scraped for.
-		The date to start scraping must be before the date to end scraping.
 		WIcker will scrape the text of the article as it was on the day that is selected.
 		However, if the date to start scraping is prior to the article's creation,
-			WIcker will return the earliest version of the article for that time.<br>
-	How often the article will be scraped determines at what times the scraper will collect a version.
-		Note that a larger number of versions will take longer to scrape.<br>
-	You can request that WIcker print the resulting text as xml or in a human readable format.
-		Characters such as "&amp;" and "&lt;" are removed from the resulting xml text to prevent xml errors.
+			WIcker will return the earliest version of the article for that time.</p>
+	<p>How often the article will be scraped determines at what times the scraper will collect a version.
+		Note that a larger number of versions will take longer to scrape.</p>
+	<p>You can request that WIcker print the resulting text as xml or in a human readable format.
+		Characters such as "&amp;" and "&lt;" are removed from the resulting text to prevent xml errors.
 		As well, you can choose between plain text formatting and Wikipedia style formatting.
-		Plain text format is more readable, but has data such as links and the infobox removed.<br>
-	Then press the "Scrape" button and WIcker will print the corpus below the Wikipedia window.<br>
-	To copy the resulting text, press the "Select Text" button and the copy it into whatever software you wish to use.<br>
-	The "Reset" button clears the form and the output section. It is suggested that the form be reset between scrapes to prevent errors.<br>
+		Plain text format is more readable, but has data such as links and the infobox removed.</p>
+	Once the form is filled, press the "Scrape" button and WIcker will print the corpus below the Wikipedia window.
+	To copy the resulting text, press the "Select Text" button and the copy it into whatever software you wish to use to analyze it.
+	The "Reset" button clears the form and the output section.
 </section>
 <section class="mainFormAndOutput">
 	<!-- Form for User on Left -->
