@@ -185,13 +185,20 @@ function wikiScrapeGo()
 		{
 			if (pages[id].revisions && pages[id].revisions[0] && pages[id].revisions[0]["revid"])
 			{
-				var firstRevisionId = pages[id].revisions[0]["revid"];
+				var firstRevisionTime = pages[id].revisions[0]["timestamp"];
 
 				// Change the timestamp of the first revision to date format
 				// Given a string in the format: 2014-11-26..., parse and store as a date object
 				var firstRevisionDate = new Date( pages[id].revisions[0]["timestamp"].substring(0, 4),
 							(pages[id].revisions[0]["timestamp"].substring(5, 7) - 1),
 								pages[id].revisions[0]["timestamp"].substring(8, 10) );
+
+				/*// Check if the first revision we found has a correct parent id of 0
+				// If this is not true, it indicates something about the article, but I'm not sure what
+				if(pages[id].revisions[0]["parentid"] != 0)
+				{
+					sendError("Special Error: First revision has a parent id.");
+				}*/
 
 				// Check if user entered a start date before article existed
 				if (firstRevisionDate >= startDateObj)
@@ -212,7 +219,7 @@ function wikiScrapeGo()
 					calcDate.setTime(startMiliSec);
 
 					// Go to recursive funtion with initial data
-					findNextRevision( firstRevisionId, getIntervalDate, getAddress, calcDate, endDateObj, contentArray);
+					findNextRevision( firstRevisionTime, getIntervalDate, getAddress, calcDate, endDateObj, contentArray);
 				}
 				else {
 					/*	
@@ -241,7 +248,7 @@ function wikiScrapeGo()
 						{
 							if (pages[id].revisions && pages[id].revisions[0] && pages[id].revisions[0]["revid"])
 							{
-								var lastRevisionId = pages[id].revisions[0]["revid"];
+								var lastRevisionTime = pages[id].revisions[0]["timestamp"];
 
 								// Change the timestamp of the last revision to date format
 								// Given a string in the format: 2014-11-26..., parse and store as a date object
@@ -268,7 +275,7 @@ function wikiScrapeGo()
 									calcDate.setTime(startMiliSec);
 
 									// Go to recursive funtion with initial data
-									findNextRevision( lastRevisionId, getIntervalDate, getAddress, calcDate, endDateObj, contentArray);
+									findNextRevision( lastRevisionTime, getIntervalDate, getAddress, calcDate, endDateObj, contentArray);
 								}
 								else {
 									/*	
@@ -297,27 +304,23 @@ function wikiScrapeGo()
 										{
 											if (pages[id].revisions && pages[id].revisions[0] && pages[id].revisions[0]["revid"])
 											{
-												/*	If the first revision after the start time has a parent,
+												// Store specific revision's data for later use in next ajax call
+												var revTimeFirst = pages[id].revisions[0]["timestamp"];
+												var revIdFirst = pages[id].revisions[0]["revid"];
+												var revUserFirst = pages[id].revisions[0]["user"];
+												var revContentFirst = pages[id].revisions[0]["*"];
+
+												/*	If the first revision after the start time does not have a parent,
 												 *	use that revision as the "first"
 												 */
-												if( pages[id].revisions[0]["parentid"] != 0)
+												if( pages[id].revisions[0]["parentid"] == 0)
 												{
-													var revIdFirst = pages[id].revisions[0]["parentid"];
-													// Empty array for storing results
-													var contentArray = new Array();
-
-													// Go to recursive funtion with initial data
-													findNextRevision( revIdFirst, getIntervalDate, getAddress, startDateObj,
-															endDateObj, contentArray);
-												}
-												else {
-													var revIdFirst = pages[id].revisions[0]["revid"];
 													// Empty array for storing results
 													var contentArray = new Array();
 													// Fill array with initial revision: Get timestamp and content of current revision
-													contentArray.push(pages[id].revisions[0]["timestamp"]);
-													contentArray.push(pages[id].revisions[0]["user"]);
-													contentArray.push(pages[id].revisions[0]["*"]);
+													contentArray.push(revTimeFirst);
+													contentArray.push(revUserFirst);
+													contentArray.push(revContentFirst);
 
 													// Calculate the next interval of time: Get the total miliseconds of the start date
 													var startMiliSec = Date.parse(startDateObj);
@@ -327,8 +330,116 @@ function wikiScrapeGo()
 													calcDate.setTime(startMiliSec);
 
 													// Go to recursive funtion with initial data
-													findNextRevision( revIdFirst, getIntervalDate, getAddress, calcDate,
+													findNextRevision( revTimeFirst, getIntervalDate, getAddress, calcDate,
 															endDateObj, contentArray);
+												}
+												else {
+													// Change the timestamp of the specific revision to date format
+													// Given a string in the format: 2014-11-26..., parse and store as a date object
+													var specificRevisionDate = new Date( pages[id].revisions[0]["timestamp"].substring(0, 4),
+																(pages[id].revisions[0]["timestamp"].substring(5, 7) - 1),
+																	pages[id].revisions[0]["timestamp"].substring(8, 10) );
+
+													// Make the parent wiki address, includng the specific revision
+													var parentWikiAddress = findParentAddress(getAddress, pages[id].revisions[0]["parentid"]);
+
+													$.ajax({
+														dataType: "json",
+														type: "GET",
+														url: parentWikiAddress, 
+														timeout: localTimeout
+													}).then ( function(data)
+													{
+														// Check if the data we expect exists
+														if (data && data.query && data.query.pages) {
+															// Cut through the nested json object
+															var pages = data.query.pages;
+														}
+														else {
+															// ERROR. No pages returned.
+															sendError("Wikipedia article was not found through parentid.");
+														}
+														// Loop over the one property of data.query.pages
+														for (var id in pages)
+														{
+															if (pages[id].revisions && pages[id].revisions[0] && pages[id].revisions[0]["revid"])
+															{
+																var parentRevisionTime = pages[id].revisions[0]["timestamp"];
+
+																// Change the timestamp of the parent revision to date format
+																// Given a string in the format: 2014-11-26..., parse and store as a date object
+																var parentRevisionDate = new Date(
+																		pages[id].revisions[0]["timestamp"].substring(0, 4),
+																			(pages[id].revisions[0]["timestamp"].substring(5, 7) - 1),
+																				pages[id].revisions[0]["timestamp"].substring(8, 10) );
+
+																// Calculate the milliseconds of all the date objects for comparison
+																var startMiliSec = Date.parse(startDateObj);
+																var parentMiliSec = Date.parse(parentRevisionDate);
+																var specificMiliSec = Date.parse(specificRevisionDate);
+
+																// If parent revision timestamp is before both start date and
+																// specific revision timestamp, use parent as first revision
+																// Also check if the child of this ajax call is the same as the
+																// 		specific revision above. If it is not, go with specific revision
+																if( (parentMiliSec < startMiliSec) && (parentMiliSec < specificMiliSec) 
+																	&& (revIdFirst == pages[id].revisions[1]["revid"]) )
+																{
+																	// Empty array for storing results
+																	var contentArray = new Array();
+																	// Fill array with initial revision:
+																	// Get timestamp and content of current revision
+																	contentArray.push(pages[id].revisions[0]["timestamp"]);
+																	contentArray.push(pages[id].revisions[0]["user"]);
+																	contentArray.push(pages[id].revisions[0]["*"]);
+
+																	// Calculate the next interval of time
+																	// Use startMiliSec to calculate the next time we want to grab a revision
+																	startMiliSec = startMiliSec + getMiliseconds(getIntervalDate);
+																	var calcDate = new Date();
+																	calcDate.setTime(startMiliSec);
+
+																	// Go to recursive funtion with initial data
+																	findNextRevision( parentRevisionTime, getIntervalDate, getAddress, calcDate,
+																			endDateObj, contentArray);
+																}
+																// Use specific revision
+																else
+																{
+																	// Empty array for storing results
+																	var contentArray = new Array();
+																	// Fill array with initial revision:
+																	// Get timestamp and content of current revision
+																	contentArray.push(revTimeFirst);
+																	contentArray.push(revUserFirst);
+																	contentArray.push(revContentFirst);
+
+																	// Calculate the next interval of time:
+																	// Get the total miliseconds of the start date
+																	var startMiliSec = Date.parse(startDateObj);
+																	// Use those to calculate the next time we want to grab a revision
+																	startMiliSec = startMiliSec + getMiliseconds(getIntervalDate);
+																	var calcDate = new Date();
+																	calcDate.setTime(startMiliSec);
+
+																	// Go to recursive funtion with initial data
+																	findNextRevision( revTimeFirst, getIntervalDate, getAddress, calcDate,
+																			endDateObj, contentArray);
+																}
+															}
+															else {
+																// ERROR. No revision content returned.
+																sendError("No revisions were found when using the parentid.");
+															}
+														}
+													}).fail( function(xmlhttprequest, textstatus, message)
+													{
+														if(textstatus == "timeout") {
+															sendError("Fourth request to Wikipedia timed out.");
+														} else {
+															sendError(textstatus);
+														}
+													});
 												}
 											}
 											else {
@@ -382,13 +493,13 @@ function wikiScrapeGo()
  *	Recursively find the next revision after the one given that satisfies the given interval of time
  *	Finds all the revisions and places them into an array
  */
-function findNextRevision( revisionId, intervalDate, gottenAddress, calcDate, endDate, contentArray)
+function findNextRevision( revisionDate, intervalDate, gottenAddress, calcDate, endDate, contentArray)
 {
 	// Progress bar update
 	updateProgressBar(calcDate, endDate);
 
 	// Parse the wikiAddress together
-	wikiAddress = parseAddress(gottenAddress, revisionId);
+	wikiAddress = parseAddress(gottenAddress, revisionDate);
 
 	// Get JSON object from given data
 	$.ajax({
@@ -398,8 +509,8 @@ function findNextRevision( revisionId, intervalDate, gottenAddress, calcDate, en
 		timeout: 8000
 	}).then ( function(data)
 	{
-		// Variable to store last stored revision id
-		var lastRevId = revisionId;
+		// Variable to store last stored revision timestamp
+		var lastRevTime = revisionDate;
 
 		// Check if the data we expect exists
 		if (data && data.query && data.query.pages) {
@@ -435,7 +546,7 @@ function findNextRevision( revisionId, intervalDate, gottenAddress, calcDate, en
 							contentArray.push(pages[id].revisions[i]["*"]);
 
 							// Store the revison id as the last chosen revison id
-							lastRevId = pages[id].revisions[i]["revid"];
+							lastRevTime = pages[id].revisions[i]["timestamp"];
 
 							// re-calculate calcDate for next interval
 							var startMiliSec = Date.parse(calcDate) + getMiliseconds(intervalDate);
@@ -467,7 +578,7 @@ function findNextRevision( revisionId, intervalDate, gottenAddress, calcDate, en
 							contentArray.push(pages[id].revisions[i]["*"]);
 
 							// Store the revison id as the last chosen revison id
-							lastRevId = pages[id].revisions[i]["revid"];
+							lastRevTime = pages[id].revisions[i]["timestamp"];
 
 							// re-calculate calcDate for next interval
 							var startMiliSec = Date.parse(calcDate) + getMiliseconds(intervalDate);
@@ -484,9 +595,9 @@ function findNextRevision( revisionId, intervalDate, gottenAddress, calcDate, en
 					else if ( (pages[id].revisions.length -1) == i)
 					{
 						// Store the revison id as the last chosen revison id
-						lastRevId = pages[id].revisions[i]["revid"];
+						lastRevTime = pages[id].revisions[i]["timestamp"];
 						// Do a recursive call and merge with content array starting with last revision id
-						findNextRevision( lastRevId, intervalDate, gottenAddress, calcDate, endDate, contentArray);
+						findNextRevision( lastRevTime, intervalDate, gottenAddress, calcDate, endDate, contentArray);
 						return;
 					}
 				}
@@ -862,12 +973,12 @@ function findLastRevision(gottenAddress)
 
 
 /*
- *	Called from findNextRevision
+ *	Called from wikiScrapeGo
  *	Parse the wiki address together in json format using the information given
  *	Requests the id, timestamp, user and full content of the revisions
- *	Uses max limit, which is apparently 50
+ *	Uses a limit of 2, as that is all that is needed.
  */
-function parseAddress(gottenAddress, revisionId)
+function findParentAddress(gottenAddress, revisionId)
 {
 	/*
 	 *	Build the Url to scrape: 
@@ -899,6 +1010,54 @@ function parseAddress(gottenAddress, revisionId)
 	// Concat the address together
 	var tempWikiAddress = wikiAddressOne.concat( wikiAddressLangTwo, wikiAddressThree,
 				revisionId, wikiAddressFive, wikiAddressTitleSix);
+	
+	// return the full address
+	return tempWikiAddress;
+}
+
+
+/*
+ *	Called from findNextRevision
+ *	Parse the wiki address together in json format using the information given
+ *	Requests the id, timestamp, user and full content of the revisions
+ *	Uses max limit, which is apparently 50
+ */
+function parseAddress(gottenAddress, revisionDate)
+{
+	/*
+	 *	Build the Url to scrape: 
+	 *	Find the next entries, and grab the ones we need	
+	 */
+	// Standard URL parts for scraping
+	var wikiAddressOne = "http://";
+	var wikiAddressThree = ".wikipedia.org/w/api.php?format=json&action=query&prop=revisions" +
+							"&callback=?&rvlimit=max&rvstart=";
+	var wikiAddressFive = "&rvdir=newer&rvprop=ids|timestamp|user|content&titles=";
+
+	// Parse the given date and remove all non-number characters
+	// Assuming: "timestamp":"2002-01-08T07:10:59Z" format
+	var wikiAddressDateFour = revisionDate.replace(/[^0-9]/g,'');
+
+	// Parse language and title from gotten address
+	// Assuming a certain form of URL. Example:
+	/*	http://en.wikipedia.org/wiki/Ada_Lovelace
+	 *	[0] = http:
+	 *	[1] = 
+	 *	[2] = en.wikipedia.org
+	 *	[3] = wiki
+	 *	[4] = Ada_Lovelace
+	 */
+	var addressArray = gottenAddress.split("/");
+	var tempLanguage = addressArray[2];
+	var languageArray = tempLanguage.split(".");
+
+	// Assign language and title variables
+	var wikiAddressTitleSix = addressArray[4];
+	var wikiAddressLangTwo = languageArray[0];
+
+	// Concat the address together
+	var tempWikiAddress = wikiAddressOne.concat( wikiAddressLangTwo, wikiAddressThree,
+				wikiAddressDateFour, wikiAddressFive, wikiAddressTitleSix);
 	
 	// return the full address
 	return tempWikiAddress;
@@ -1151,10 +1310,9 @@ function disableForm()
  */
  function sendError(errorString)
  {
- 	$('#errorOutputAlert').html("<button type='button' class='close alert-close' aria-label='Close'>×</button> <b>Error!</b> " + errorString);
+ 	$('#errorOutputAlert').html("<button type='button' class='close alert-close' aria-label='Close'>×</button> <b>Error!</b> " + errorString
+ 			+ " Please reset the form and try again.");
 	$('#errorOutputAlert').slideDown(460);
-	//Re-enable the form for editing
-	enableForm();
  }
 
 
