@@ -4,7 +4,7 @@
  *	Original idea by Robert Budac
  *	Contributors: Andrea Budac, Geoffrey Rockwell, Zachary Palmer, Robert Budac, Stan Ruecker
  *	*************************************************************************************************
- *	WIkcer (Wikipedia Idea Scraper) is a tool for scraping old revisions of Wikipedia articles.
+ *	WIScker (Wikipedia Idea Scraper) is a tool for scraping old revisions of Wikipedia articles.
  *	The corpus resulting from the scrape is then available to the user to analyze as they see fit.
  *	
  *	Copyright (C) 2014-2015  Andrea Budac and INKE
@@ -39,6 +39,8 @@ $(document).ready(function () {
 	$('#printOutHere').text('');
 	// Disable the select output text button
 	$('#selectTextButton').prop('disabled', true);
+	// Enable reset button
+	$('#resetButton').prop('disabled', false);
 
 	// Reset preview to Wikipedia main page
 	$('#previewFrame').prop('src', $('#wikiAddress').prop('placeholder') );
@@ -85,10 +87,27 @@ $(document).ready(function () {
 	$("#aboutInfo").click( function() {
 		$("#aboutPanel").slideToggle(460);
 		$("#helpPanel").slideUp(460);
+		$("#questionsPanel").slideUp(460);
 	});
 	$("#helpInfo").click( function() {
 		$("#helpPanel").slideToggle(460);
 		$("#aboutPanel").slideUp(460);
+		$("#questionsPanel").slideUp(460);
+	});
+	$("#questionsInfo").click( function() {
+		$("#questionsPanel").slideToggle(460);
+		$("#aboutPanel").slideUp(460);
+		$("#helpPanel").slideUp(460);
+	});
+
+	// Initialize form slide panels with custom transition time
+	$("#scrapeTypeRadio1").click( function() {
+		$("#datePanel").slideDown(460);
+		$("#frequencyPanel").slideUp(460);
+	});
+	$("#scrapeTypeRadio2").click( function() {
+		$("#frequencyPanel").slideDown(460);
+		$("#datePanel").slideUp(460);
 	});
 
 	// Inititalize popovers with no content
@@ -124,7 +143,6 @@ $(function() {
 /*
  *	When the submit button (id = submitButton) is clicked
  *	grab all the given info
- *	concat the address and parse
  */
 function wikiScrapeGo()
 {
@@ -134,22 +152,248 @@ function wikiScrapeGo()
 		return;
 	}
 
-	// Set local timeout in miliseconds
-	var localTimeout = 8000;
-
-	// Grab the dates and interval data
-	var getStartDate = $('#startDate').val();
-	var getEndDate = $('#endDate').val();
-	var getIntervalDate = $('#oftenDate').val();
 	// Grab the full Address
 	var getAddress = $('#wikiAddress').val();
 
-	// Disable the form to prevent retreival errors
+	// Disable the form to prevent retrieval errors
 	disableForm();
 	// Reset the progress bar to 0%
 	$('#progressBar').width('0%');
 	// Show the progress bar
 	$("#progressBarWrapper").slideDown(460);
+
+	// Check scrape type 
+	if( $('.scrapeTypeRadio:checked').val() == "dateSelected")
+	{
+		// Grab the dates and interval data
+		var getStartDate = $('#startDate').val();
+		var getEndDate = $('#endDate').val();
+		var getIntervalDate = $('#oftenDate').val();
+
+		findFirstRevisionByDate(getStartDate, getEndDate, getIntervalDate, getAddress);
+	}
+	else if( $('.scrapeTypeRadio:checked').val() == "frequencySelected")
+	{
+		// Grab the wanted frequency
+		var getFrequency = $('#frequentDate').val();
+
+		findFirstRevisionByType(getFrequency, getAddress);
+	}
+	else
+	{
+		sendError("Unknown scrape type selected.");
+	}
+}
+
+
+/*
+ *	Called from wikiScrapeGo()
+ *	Concat the address and find the very first revision
+ */
+function findFirstRevisionByType(getFrequency, getAddress)
+{
+	// Set local timeout in miliseconds
+	var localTimeout = 60000;
+
+	// Parse the wikiAddress together
+	var findFirstWikiAddress = findFirstRevision( getAddress);
+	var findLastWikiAddress = findLastRevision( getAddress);
+
+	// Get JSON object from given data: Find the first revision for the given article
+	$.ajax({
+		dataType: "json",
+		type: "GET",
+		url: findFirstWikiAddress,
+		timeout: localTimeout
+	}).then ( function(data)
+	{
+		// Check if the data we expect exists
+		if (data && data.query && data.query.pages) {
+		// Cut through the nested json object	
+		var pages = data.query.pages;
+		}
+		else {
+			// ERROR. No pages returned.
+			sendError("Wikipedia article was not found the first time when searching by type.");
+		}
+		// Loop over the one property of data.query.pages
+		for (var id in pages)
+		{
+			if (pages[id].revisions && pages[id].revisions[0] && pages[id].revisions[0]["revid"])
+			{
+				var firstRevisionTime = pages[id].revisions[0]["timestamp"];
+
+				/*// Check if the first revision we found has a correct parent id of 0
+				// If this is not true, it indicates something about the article, but I'm not sure what
+				if(pages[id].revisions[0]["parentid"] != 0)
+				{
+					sendError("Special Error: First revision has a parent id.");
+				}*/
+
+				// Empty array for storing results
+				var contentArray = new Array();
+				// Fill array with initial revision: Get timestamp and content of current revision
+				contentArray.push(pages[id].revisions[0]["timestamp"]);
+				contentArray.push(pages[id].revisions[0]["user"]);
+				contentArray.push(pages[id].revisions[0]["*"]);
+
+				// Get JSON object from given data: Find the last revision for the given article
+				$.ajax({
+					dataType: "json",
+					type: "GET",
+					url: findLastWikiAddress,
+					timeout: localTimeout
+				}).then ( function(data)
+				{
+					// Check if the data we expect exists
+					if (data && data.query && data.query.pages) {
+						// Cut through the nested json object
+						var pages = data.query.pages;
+					}
+					else {
+						// ERROR. No pages returned.
+						sendError("Wikipedia article was not found a second time.");
+					}
+					// Loop over the one property of data.query.pages
+					for (var id in pages)
+					{
+						if (pages[id].revisions && pages[id].revisions[0] && pages[id].revisions[0]["revid"])
+						{
+							var lastRevisionTime = pages[id].revisions[0]["timestamp"];
+
+							// Go to recursive funtion with initial data
+							findNextFrequentRevision( firstRevisionTime, lastRevisionTime, getFrequency, getAddress, contentArray);
+						}
+						else {
+							// ERROR. No revision content returned.
+							sendError("No final revisions were found when searching by type.");
+						}
+					}
+				}).fail( function(xmlhttprequest, textstatus, message)
+				{
+					if(textstatus == "timeout") {
+						sendError("Second request to Wikipedia timed out when searching by type.");
+					} else {
+						sendError(textstatus);
+					}
+				});
+			}
+			else {
+				// ERROR. No revision content returned.
+				sendError("No early revisions were found by type.");
+			}
+		}
+	}).fail( function(xmlhttprequest, textstatus, message)
+	{
+		if(textstatus == "timeout") {
+			sendError("First request to Wikipedia timed out when searching by type.");
+		} else {
+			sendError(textstatus);
+		}
+	});
+}
+
+
+/*
+ *	Called from findFirstRevisionByType()
+ *	Recursively find the next revision after the one given that satisfies the given frequency
+ *	Finds all the revisions and places them into an array
+ */
+function findNextFrequentRevision( revisionDate, endDate, intervalFreqency, gottenAddress, contentArray)
+{
+	// Progress bar update
+	updateProgressBar(revisionDate, endDate);
+
+	// Parse the wikiAddress together
+	wikiAddress = parseAddress(gottenAddress, revisionDate);
+
+	// Get JSON object from given data
+	$.ajax({
+		dataType: "json",
+		type: "GET",
+		url: wikiAddress,
+		timeout: 60000
+	}).then ( function(data)
+	{
+		// Variable to store last stored revision timestamp
+		var lastRevTime = revisionDate;
+
+		// Check if the data we expect exists
+		if (data && data.query && data.query.pages) {
+			// Cut through the nested json object
+			var pages = data.query.pages;
+		}
+		else {
+			// ERROR. No pages returned.
+			sendError("Wikipedia article was not found the third time when searching by type.");
+		}
+		// Loop over the one property of data.query.pages
+		for (var id in pages)
+		{
+			if (pages[id].revisions && pages[id].revisions[0] && pages[id].revisions[0]["*"])
+			{
+				// Check if the number of revisions returned is less than the frequency interval
+				if( pages[id].revisions.length < intervalFreqency)
+				{
+					finalContent(contentArray, gottenAddress);
+					return;
+				}
+				else if ( pages[id].revisions.length >= intervalFreqency)
+				{
+					// Loop through the json object to find the next revisions
+					for( var i = (intervalFreqency -1); i < pages[id].revisions.length; i + intervalFreqency)
+					{
+						// Store the current revision
+						contentArray.push(pages[id].revisions[i]["timestamp"]);
+						contentArray.push(pages[id].revisions[i]["user"]);
+						contentArray.push(pages[id].revisions[i]["*"]);
+
+						// Store the revison timestamp as the last chosen revison timestamp
+						lastRevTime = pages[id].revisions[i]["timestamp"];
+
+						// If current revision's date equals endDate, return.
+						if( endDate == lastRevTime)
+						{
+							finalContent(contentArray, gottenAddress);
+							return;
+						}
+						// If the current revision is the last revision of the json object
+						else if ( (pages[id].revisions.length -1) == i)
+						{
+							// Store the revison timestamp as the last chosen revison timestamp
+							lastRevTime = pages[id].revisions[i]["timestamp"];
+							// Do a recursive call and merge with content array starting with last revision id
+							findNextFrequentRevision( lastRevTime, endDate, intervalFreqency, gottenAddress, contentArray);
+							return;
+						}
+					}
+				}
+			}
+			else {
+				// ERROR. No revision content returned.
+				sendError("Recursive look for revisions could not find any when searching by type.");
+			}
+		}
+	}).fail( function(xmlhttprequest, textstatus, message)
+	{
+		if(textstatus == "timeout") {
+			sendError("Most recent request to Wikipedia timed out when searching by type.");
+		} else {
+			sendError(textstatus);
+		}
+	});
+}
+
+
+/*
+ *	Called from wikiScrapeGo()
+ *	Concat the address using the date and parse the resulting data
+ *	Once have the info, send requests to Wikipedia to find first wanted revision
+ */
+function findFirstRevisionByDate(getStartDate, getEndDate, getIntervalDate, getAddress)
+{
+	// Set local timeout in miliseconds
+	var localTimeout = 60000;
 
 	// Given a string in the format: 2014/11/26, parse and store as a date object
 	// Subtract 1 off of month, since month counting starts at zero
@@ -489,7 +733,7 @@ function wikiScrapeGo()
 
 
 /*
- *	Called from wikiScrapeGo()
+ *	Called from findFirstRevisionByDate()
  *	Recursively find the next revision after the one given that satisfies the given interval of time
  *	Finds all the revisions and places them into an array
  */
@@ -506,7 +750,7 @@ function findNextRevision( revisionDate, intervalDate, gottenAddress, calcDate, 
 		dataType: "json",
 		type: "GET",
 		url: wikiAddress,
-		timeout: 8000
+		timeout: 60000
 	}).then ( function(data)
 	{
 		// Variable to store last stored revision timestamp
@@ -545,7 +789,7 @@ function findNextRevision( revisionDate, intervalDate, gottenAddress, calcDate, 
 							contentArray.push(pages[id].revisions[i]["user"]);
 							contentArray.push(pages[id].revisions[i]["*"]);
 
-							// Store the revison id as the last chosen revison id
+							// Store the revison timestamp as the last chosen revison timestamp
 							lastRevTime = pages[id].revisions[i]["timestamp"];
 
 							// re-calculate calcDate for next interval
@@ -577,7 +821,7 @@ function findNextRevision( revisionDate, intervalDate, gottenAddress, calcDate, 
 							contentArray.push(pages[id].revisions[i]["user"]);
 							contentArray.push(pages[id].revisions[i]["*"]);
 
-							// Store the revison id as the last chosen revison id
+							// Store the revison timestamp as the last chosen revison timestamp
 							lastRevTime = pages[id].revisions[i]["timestamp"];
 
 							// re-calculate calcDate for next interval
@@ -594,7 +838,7 @@ function findNextRevision( revisionDate, intervalDate, gottenAddress, calcDate, 
 					// If the current revision is the last revision of the json object
 					else if ( (pages[id].revisions.length -1) == i)
 					{
-						// Store the revison id as the last chosen revison id
+						// Store the revison timestamp as the last chosen revison timestamp
 						lastRevTime = pages[id].revisions[i]["timestamp"];
 						// Do a recursive call and merge with content array starting with last revision id
 						findNextRevision( lastRevTime, intervalDate, gottenAddress, calcDate, endDate, contentArray);
@@ -683,11 +927,26 @@ function finalContent(contentArray, gottenAddress)
 	var addressArray = gottenAddress.split("/");
 	var wikiTitle = addressArray[4];
 
-	// Get the start and end date of the scrape
-	var getStartDate = $('#startDate').val();
-	var getEndDate = $('#endDate').val();
-	// Get the time interval of the scrape in text
-	var timeInterval = $("#oftenDate option:selected").text();
+	if( $('.scrapeTypeRadio:checked').val() == "dateSelected")
+	{
+		// Get the start and end date of the scrape
+		var getStartDate = $('#startDate').val();
+		var getEndDate = $('#endDate').val();
+		// Get the time interval of the scrape in text
+		var timeInterval = $("#oftenDate option:selected").text();
+		// Store the scrape type
+		var scrapeType = "dateSelected";
+	}
+	else //if ( $('.scrapeTypeRadio:checked').val() == "frequencySelected")
+	{
+		// Enter blank strings for start and end date
+		var getStartDate = "";
+		var getEndDate = "";
+		// Get the time interval of the scrape in text
+		var timeInterval = $("#frequentDate option:selected").text();
+		// Store the scrape type
+		var scrapeType = "frequencySelected";
+	}
 
 	// Get the format the user wants
 	var getFormat = $('#textFormat').val();
@@ -696,14 +955,14 @@ function finalContent(contentArray, gottenAddress)
 	// 1 is xml, 2 is human readable, 3 is plain text, 4 is Wikipedia style formatting
 	if( getFormat == 1) {
 		// Add xml markup
-		var finalString = addXML(contentArray, wikiTitle, getStartDate, getEndDate, timeInterval, getBodyTextFormat);
+		var finalString = addXML(contentArray, scrapeType, wikiTitle, getStartDate, getEndDate, timeInterval, getBodyTextFormat);
 		// Print out final text
 		//$('#printOutHere').text(finalString);
 		document.getElementById('printOutHere').innerHTML = finalString;
 	}
 	else if( getFormat == 2) {
 		// Make human readable
-		var finalString = makeHumanReadable(contentArray, wikiTitle, getStartDate, getEndDate, timeInterval, getBodyTextFormat);
+		var finalString = makeHumanReadable(contentArray, scrapeType, wikiTitle, getStartDate, getEndDate, timeInterval, getBodyTextFormat);
 		// Print out final text
 		//$('#printOutHere').text(finalString);
 		document.getElementById('printOutHere').innerHTML = finalString;
@@ -715,6 +974,8 @@ function finalContent(contentArray, gottenAddress)
 
 	// Allow user to select the recently printed text
 	$('#selectTextButton').prop('disabled', false);
+	// Enable Reset button
+	$('#resetButton').prop('disabled', false);
 
 	//Re-enable the form for editing
 	enableForm();
@@ -727,7 +988,7 @@ function finalContent(contentArray, gottenAddress)
  *	Add xml markup to resulting array and return a string
  *	Called when final array is finished
  */
-function addXML( givenArray, title, startDate, endDate, timeInterval, bodyTextFormat)
+function addXML( givenArray, scrapeType, title, startDate, endDate, timeInterval, bodyTextFormat)
 {
 	// Get current date and time
 	var currentDate = new Date();
@@ -742,9 +1003,17 @@ function addXML( givenArray, title, startDate, endDate, timeInterval, bodyTextFo
 	xmlString = xmlString.concat("&lt;header&gt;<br>");
 	xmlString = xmlString.concat("&lt;wikipedia_article_title&gt;", title, "&lt;/wikipedia_article_title&gt;<br>");
 	xmlString = xmlString.concat("&lt;scrape_time&gt;", currentDate, "&lt;/scrape_time&gt;<br>");
-	xmlString = xmlString.concat("&lt;start_scrape_date&gt;", startDate, "&lt;/start_scrape_date&gt;<br>");
-	xmlString = xmlString.concat("&lt;end_scrape_date&gt;", endDate, "&lt;/end_scrape_date&gt;<br>");
-	xmlString = xmlString.concat("&lt;time_interval&gt;", timeInterval, "&lt;/time_interval&gt;<br>");
+	// Check scrape type and print accordingly
+	if(scrapeType == "dateSelected")
+	{
+		xmlString = xmlString.concat("&lt;start_scrape_date&gt;", startDate, "&lt;/start_scrape_date&gt;<br>");
+		xmlString = xmlString.concat("&lt;end_scrape_date&gt;", endDate, "&lt;/end_scrape_date&gt;<br>");
+		xmlString = xmlString.concat("&lt;time_interval&gt;", timeInterval, "&lt;/time_interval&gt;<br>");
+	}
+	else //if (scrapeType == "frequencySelected")
+	{
+		xmlString = xmlString.concat("&lt;time_interval&gt;", timeInterval, "&lt;/time_interval&gt;<br>");
+	}
 	xmlString = xmlString.concat("&lt;/header&gt;<br>");
 
 	for( var i = 0; i < givenArray.length; i++)
@@ -776,18 +1045,30 @@ function addXML( givenArray, title, startDate, endDate, timeInterval, bodyTextFo
  *	Add line breaks, and text to resulting array and return a string
  *	Called when final array is finished
  */
-function makeHumanReadable( givenArray, title, startDate, endDate, timeInterval, bodyTextFormat)
+function makeHumanReadable( givenArray, scrapeType, title, startDate, endDate, timeInterval, bodyTextFormat)
 {
 	// Get current date and time
 	var currentDate = new Date();
 	// Parse the title
 	title = decodeURI(title);
 	title = title.replace(/_/g, ' ');
-	// Start building string
-	var readableString = "----------------<br>Wikipedia Article: " + title
-			+ "<br>----------------<br>Scrape Date: " + currentDate
-			+ "<br>----------------<br>Scraping: from " + startDate
-			+ " to " + endDate + ", " + timeInterval + "." + "<br>";
+
+	// Check scrape type and print accordingly
+	if(scrapeType == "dateSelected")
+	{	
+		// Start building string
+		var readableString = "----------------<br>Wikipedia Article: " + title
+				+ "<br>----------------<br>Scrape Date: " + currentDate
+				+ "<br>----------------<br>Scraping: from " + startDate
+				+ " to " + endDate + ", " + timeInterval + "." + "<br>";
+	}
+	else //if (scrapeType == "frequencySelected")
+	{
+		// Start building string
+		var readableString = "----------------<br>Wikipedia Article: " + title
+				+ "<br>----------------<br>Scrape Date: " + currentDate
+				+ "<br>----------------<br>Scraping: " + timeInterval + "." + "<br>";
+	}
 
 	for( var i = 0; i < givenArray.length; i++)
 	{
@@ -813,7 +1094,7 @@ function makeHumanReadable( givenArray, title, startDate, endDate, timeInterval,
 
 
 /*
- *	Called from wikiScrapeGo
+ *	Called from findFirstRevisionByDate
  *	
  *	Parse the wiki address together in json format
  *	Uses a limit of two to speed up initial request
@@ -882,7 +1163,7 @@ function parseInitialAddress( gottenAddress, rawStartDate, rawEndDate)
 
 
 /*
- *	Called from wikiScrapeGo
+ *	Called from findFirstRevisionByDate
  *	Parse the wiki address together in json format using the information given
  *	Finds the very first revision of the article requested
  *	Uses a limit of one to speed up request
@@ -931,7 +1212,7 @@ function findFirstRevision(gottenAddress)
 
 
 /*
- *	Called from wikiScrapeGo
+ *	Called from findFirstRevisionByDate
  *	Parse the wiki address together in json format using the information given
  *	Finds the very last revision of the article requested
  *	Uses a limit of one to speed up request
@@ -973,7 +1254,7 @@ function findLastRevision(gottenAddress)
 
 
 /*
- *	Called from wikiScrapeGo
+ *	Called from findFirstRevisionByDate
  *	Parse the wiki address together in json format using the information given
  *	Requests the id, timestamp, user and full content of the revisions
  *	Uses a limit of 2, as that is all that is needed.
@@ -1104,86 +1385,105 @@ function validateInfo()
 		updatePreview();
 	}
 
-	// Get start date
-	var tempStartDate = $('#startDate').val();
-	/*	
-	 *	Regex expression examines if given string starts (^) with
-	 *		4 digits (\d{4}) (equal to [0-9]), followed by a / (\/),
-	 *		followed by two two digit (\d{2}) sections seperarated by a / (\/),
-	 *		and must end after the second set of two numbers ($)
-	 */
-	var dateTest = /^\d{4}\/\d{2}\/\d{2}$/;
-	// Testing if start date is valid, if user has entered a value
-	if( (!(dateTest.test(tempStartDate))) && ($('#startDate').val() != '') )
+	// Check scrape type 
+	if($('.scrapeTypeRadio:checked').val() == "dateSelected")
 	{
-		$('#submitButton').prop('disabled', true);
-		$('#startDateBox').addClass('has-error');
-		$('#startDate').data('bs.popover').options.content = "Start date needs to be in the form yyyy/mm/dd.";
-		errorToggle = true;
+		// Get start date
+		var tempStartDate = $('#startDate').val();
+		/*	
+		*	Regex expression examines if given string starts (^) with
+		*		4 digits (\d{4}) (equal to [0-9]), followed by a / (\/),
+	 	*		followed by two two digit (\d{2}) sections seperarated by a / (\/),
+	 	*		and must end after the second set of two numbers ($)
+	 	*/
+		var dateTest = /^\d{4}\/\d{2}\/\d{2}$/;
+		// Testing if start date is valid, if user has entered a value
+		if( (!(dateTest.test(tempStartDate))) && ($('#startDate').val() != '') )
+		{
+			$('#submitButton').prop('disabled', true);
+			$('#startDateBox').addClass('has-error');
+			$('#startDate').data('bs.popover').options.content = "Start date needs to be in the form yyyy/mm/dd.";
+			errorToggle = true;
+		}
+		else {
+			// Reset start date error messages
+			$('#startDateBox').removeClass('has-error');
+			$('#startDate').popover('destroy');
+			// Initialize error popovers after destruction with timeout function to stall recreating until destruction is done
+			setTimeout(function () {
+				$('#startDate').popover( {
+					placement: "right",
+					trigger: "focus hover",
+					container: "body"
+				});
+			}, 200);
+		}
+
+		// Get end date
+		var tempEndDate = $('#endDate').val();
+
+		// Given a string in the format: 2014/11/26, parse and store as a date object
+		// Subtract 1 off of month, since month counting starts at zero
+		var startDateObj = new Date( tempStartDate.substring(0, 4),
+				(tempStartDate.substring(5, 7) - 1), tempStartDate.substring(8, 10) );
+		var endDateObj = new Date( tempEndDate.substring(0, 4),
+				(tempEndDate.substring(5, 7) - 1), tempEndDate.substring(8, 10) );
+
+		// Testing if end date is valid, if user has entered a value
+		if( (!(dateTest.test(tempEndDate))) && ($('#endDate').val() != '') )
+		{
+			$('#submitButton').prop('disabled', true);
+			$('#endDateBox').addClass('has-error');
+			$('#endDate').data('bs.popover').options.content = "End date needs to be in the form yyyy/mm/dd.";
+			errorToggle = true;
+		}
+		// Check if end date is later than start date
+		else if( (startDateObj >= endDateObj)
+			&& ($('#endDate').val() != '') && ($('#startDate').val() != '') )
+		{
+			$('#submitButton').prop('disabled', true);
+			$('#endDateBox').addClass('has-error');
+			$('#endDate').data('bs.popover').options.content = "End date must be later than the start date.";
+			errorToggle = true;
+		}
+		else {
+			// Reset end date error messages
+			$('#endDateBox').removeClass('has-error');
+			$('#endDate').popover('destroy');
+			// Initialize error popovers after destruction with timeout function to stall recreating until destruction is done
+			setTimeout(function () {
+				$('#endDate').popover( {
+					placement: "right",
+					trigger: "focus hover",
+					container: "body"
+				});
+			}, 200);
+		}
+
+		// Final check that nothing is empty
+		if( ($('#startDate').val() == '') ||
+			($('#endDate').val() == '') ||
+			($('#wikiAddress').val() == '') )	
+		{
+			// If anything is empty, do not allow submissions
+			$('#submitButton').prop('disabled', true);
+			errorToggle = true;
+		}
 	}
-	else {
-		// Reset start date error messages
-		$('#startDateBox').removeClass('has-error');
-		$('#startDate').popover('destroy');
-		// Initialize error popovers after destruction with timeout function to stall recreating until destruction is done
-		setTimeout(function () {
-			$('#startDate').popover( {
-				placement: "right",
-				trigger: "focus hover",
-				container: "body"
-			});
-		}, 200);
-	}
-
-	// Get end date
-	var tempEndDate = $('#endDate').val();
-
-	// Given a string in the format: 2014/11/26, parse and store as a date object
-	// Subtract 1 off of month, since month counting starts at zero
-	var startDateObj = new Date( tempStartDate.substring(0, 4),
-			(tempStartDate.substring(5, 7) - 1), tempStartDate.substring(8, 10) );
-	var endDateObj = new Date( tempEndDate.substring(0, 4),
-			(tempEndDate.substring(5, 7) - 1), tempEndDate.substring(8, 10) );
-
-	// Testing if end date is valid, if user has entered a value
-	if( (!(dateTest.test(tempEndDate))) && ($('#endDate').val() != '') )
+	else if($('.scrapeTypeRadio:checked').val() == "frequencySelected")
 	{
-		$('#submitButton').prop('disabled', true);
-		$('#endDateBox').addClass('has-error');
-		$('#endDate').data('bs.popover').options.content = "End date needs to be in the form yyyy/mm/dd.";
-		errorToggle = true;
+		// Final check that nothing is empty
+		if( $('#wikiAddress').val() == '')
+		{
+			// If anything is empty, do not allow submissions
+			$('#submitButton').prop('disabled', true);
+			errorToggle = true;
+		}
 	}
-	// Check if end date is later than start date
-	else if( (startDateObj >= endDateObj)
-		&& ($('#endDate').val() != '') && ($('#startDate').val() != '') )
+	else
 	{
-		$('#submitButton').prop('disabled', true);
-		$('#endDateBox').addClass('has-error');
-		$('#endDate').data('bs.popover').options.content = "End date must be later than the start date.";
 		errorToggle = true;
-	}
-	else {
-		// Reset end date error messages
-		$('#endDateBox').removeClass('has-error');
-		$('#endDate').popover('destroy');
-		// Initialize error popovers after destruction with timeout function to stall recreating until destruction is done
-		setTimeout(function () {
-			$('#endDate').popover( {
-				placement: "right",
-				trigger: "focus hover",
-				container: "body"
-			});
-		}, 200);
-	}
-
-	// Final check that nothing is empty
-	if( ($('#startDate').val() == '') ||
-		($('#endDate').val() == '') ||
-		($('#wikiAddress').val() == '') )	
-	{
-		// If anything is empty, do not allow submissions
-		$('#submitButton').prop('disabled', true);
-		errorToggle = true;
+		sendError("Error in scraping type selection.");
 	}
 
 	// If an error has not occured
@@ -1280,12 +1580,14 @@ function resetForm()
 
 /*
  *	Re-enable all form elements for editing
- *	When Reset button is clicked, error occurs or page is refreshed
+ *	When Reset button is clicked or page is refreshed
  */
 function enableForm()
 {
 	// Enable form elements
 	$('.form-control').prop('disabled', false);
+	$('#scrapeTypeRadio1').prop('disabled', false);
+	$('#scrapeTypeRadio2').prop('disabled', false);
 	// Disable submit button
 	$('#submitButton').prop('disabled', true);
 }
@@ -1299,10 +1601,14 @@ function disableForm()
 {
 	// Disable form elements
 	$('.form-control').prop('disabled', true);
+	$('#scrapeTypeRadio1').prop('disabled', true);
+	$('#scrapeTypeRadio2').prop('disabled', true);
 	// Disable the select output text button
 	$('#selectTextButton').prop('disabled', true);
 	// Disable submit button
 	$('#submitButton').prop('disabled', true);
+	// Disable Reset button
+	$('#resetButton').prop('disabled', true);
 }
 
 /*
@@ -1313,6 +1619,8 @@ function disableForm()
  	$('#errorOutputAlert').html("<button type='button' class='close alert-close' aria-label='Close'>×</button> <b>Error!</b> " + errorString
  			+ " Please reset the form and try again.");
 	$('#errorOutputAlert').slideDown(460);
+	// Enable Reset button
+	$('#resetButton').prop('disabled', false);
  }
 
 

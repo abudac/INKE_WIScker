@@ -4,7 +4,7 @@
  *	Original idea by Robert Budac
  *	Contributors: Andrea Budac, Geoffrey Rockwell, Zachary Palmer, Robert Budac, Stan Ruecker
  *	*************************************************************************************************
- *	WIkcer (Wikipedia Idea Scraper) is a tool for scraping old revisions of Wikipedia articles.
+ *	WIScker (Wikipedia Idea Scraper) is a tool for scraping old revisions of Wikipedia articles.
  *	The corpus resulting from the scrape is then available to the user to analyze as they see fit.
  *	
  *	Copyright (C) 2014-2015  Andrea Budac and INKE
@@ -52,7 +52,7 @@ body {
 	height: 32em;
 }
 
-#aboutInfo {
+#aboutInfo, #helpInfo, #questionsInfo {
 	font-size: 0.6em;
 	color: #55A156;
 	margin-right: 0.4%;
@@ -60,19 +60,7 @@ body {
 	cursor: pointer;
 }
 
-#helpInfo {
-	font-size: 0.6em;
-	color: #55A156;
-	margin-left: 0.4%;
-	cursor: pointer;
-}
-
-#aboutPanel {
-	display: none;
-	overflow: hidden;
-}
-
-#helpPanel {
+#aboutPanel, #helpPanel, #questionsPanel, #frequencyPanel {
 	display: none;
 	overflow: hidden;
 }
@@ -89,6 +77,10 @@ body {
 	display: none;
 }
 
+#screenSpecificBreak {
+	display: none;
+}
+
 /* 
  *	Classes
  *	Contains position and decoration
@@ -102,7 +94,7 @@ body {
 	margin-left: 5%;
 	margin-right: 5%;
 	margin-top: 1.2%;
-	margin-bottom: 1.4%;
+	margin-bottom: 2.0%;
 }
 
 .uALogo img {
@@ -138,6 +130,17 @@ body {
 	color: #224022;
 	width: 90%;
 	margin-left: 5%;
+}
+
+.radioButtons {
+	padding: 0px 12px;
+}
+
+.radioLabel {
+	font-style: normal;
+	font-weight: normal;
+	margin-bottom: 0px;
+	margin-right: 32px;
 }
 
 .wikiFormLeft {
@@ -201,4 +204,66 @@ body {
  */
 .popover.right > .arrow:after {
 	border-right-color: #A94442 !important;
+}
+
+/*
+ *	Smaller Screen formatting
+ */
+
+@media screen and (max-width: 1024px) {
+	#screenSpecificBreak {
+		display: inline;
+	}
+	
+	#siteTitle {
+		font-size: 1.6em;
+	}
+
+	.mainTitle {
+		margin-bottom: 2.8%;
+	}
+
+	.wikiFormLeft {
+		float: none;
+		width: 50%;
+		margin-left: auto;
+		margin-right: auto;
+	}
+
+	.wikiOutputRight {
+		float: none;
+		width: 80%;
+		/* Exterior Padding */
+		margin-left: auto;
+		margin-right: auto;
+	}
+}
+
+@media screen and (max-width: 700px) {
+	#siteTitle {
+		font-size: 1.4em;
+	}
+
+	#screenSpecificBreak {
+		display: none;
+	}
+
+	.uALogo {
+		display: inherit;
+		position: static;
+	}
+
+	.iNKELogo {
+		display: inherit;
+		position: static;
+		margin-top: 2%;
+	}
+
+	.wikiFormLeft {
+		width: 70%;
+	}
+
+	.wikiOutputRight {
+		width: 90%;
+	}
 }
