@@ -3,7 +3,9 @@
 ######Created by Andrea Budac
 ######Contributors: Andrea Budac, Geoffrey Rockwell, Robert Budac, Zachary Palmer, Stan Ruecker
 <br>
-The **WIScker** uses [Bootstrap](http://getbootstrap.com/ "Bootstrap") and [Bootstrap Datepicker](http://bootstrap-datepicker.readthedocs.org/en/release/ "Bootstrap Datepicker") for the interface. Boostrap is used under the MIT license and Boostrap Datepicker is used under the Apache License.
+The **WIScker** program uses [Bootstrap](http://getbootstrap.com/ "Bootstrap") and [Bootstrap Datepicker](http://bootstrap-datepicker.readthedocs.org/en/release/ "Bootstrap Datepicker") for the interface. Boostrap is used under the MIT license and Boostrap Datepicker is used under the Apache License.
+
+**WIScker** can be downloaded at [GitHub](https://github.com/abudac/INKE_WIScker "GitHub") or accessed at the [website](http://analytics.artsrn.ualberta.ca/wiscker/ "website").
 
 ###Copyright and license
 
