@@ -159,20 +159,21 @@ function wikiScrapeGo()
 
 	// Disable the form to prevent retrieval errors
 	disableForm();
-	// Reset the progress bar to 0%
-	$('#progressBar').width('0%');
+	// Reset the progress bars to 0%
+	$('#progressBarAll').width('0%');
+	$('#progressBarContent').width('0%');
 	// Show the progress bar
-	$("#progressBarWrapper").slideDown(460);
+	$("#progressBarAllWrapper").slideDown(460);
 
 	// Check scrape type 
-	if( $('.scrapeTypeRadio:checked').val() == "dateSelected")
+	if ( $('.scrapeTypeRadio:checked').val() == "dateSelected")
 	{
 		// Grab the interval data
 		var getIntervalDate = $('#oftenDate').val();
 		
 		findFirstRevision(getStartDate, getEndDate, getIntervalDate, getAddress, "date");
 	}
-	else if( $('.scrapeTypeRadio:checked').val() == "frequencySelected")
+	else if ( $('.scrapeTypeRadio:checked').val() == "frequencySelected")
 	{
 		// Grab the wanted frequency
 		var getFrequency = $('#frequentDate').val();
@@ -182,6 +183,7 @@ function wikiScrapeGo()
 	else
 	{
 		sendError("Unknown scrape type selected.");
+		return;
 	}
 }
 
@@ -203,10 +205,38 @@ function findFirstRevision(getStartDate, getEndDate, getInterval, getAddress, sc
 	var endDateObj = new Date( getEndDate.substring(0, 4),
 			(getEndDate.substring(5, 7) - 1), getEndDate.substring(8, 10) );
 
-	// Parse the wikiAddresses together
-	var fullWikiAddress = parseInitialAddress( getAddress, getStartDate, getEndDate);
-	var findFirstWikiAddress = findVeryFirstRevision( getAddress);
-	var findLastWikiAddress = findVeryLastRevision( getAddress);
+
+	// Build variable for finding the wanted revision
+	// Remove the '/' from the raw dates: assuming format of yyyy/mm/dd
+	var rawStartDate = getStartDate.replace(/\//g, '');
+	var rawEndDate = getEndDate.replace(/\//g, '');
+	// Add six zeros on the end
+	rawStartDate += "000000";
+	rawEndDate += "000000";
+	// Combine dates and API info
+	var firsRevisionInfo = "rvlimit=2&rvdir=newer&rvprop=ids|timestamp&rvstart=" + rawStartDate + "&rvend=" + rawEndDate + "&titles=";
+
+	// If the wanted frequency is under 7 days or under every 7th revision
+	if (getInterval < 7)
+	{
+		// Parse the wikiAddresses together with content
+		var fullWikiAddress = parseAddress( getAddress, firsRevisionInfo);
+		// Using start date of Wikipedia, combined with the limit of 1 and rvdir=newer, will get the first revision
+		var findFirstWikiAddress = parseAddress( getAddress, "rvlimit=1&rvdir=newer&rvprop=ids|timestamp|user|content&" +
+							"rvstart=20010115000000&titles=");
+		// Wikipedia API will return latest revision when no info given
+		var findLastWikiAddress = parseAddress( getAddress, "rvlimit=1&rvprop=ids|timestamp|user|content&titles=");
+	}
+	else {
+		// Show the secondary progress bar
+		$("#progressBarContentWrapper").slideDown(460);
+		// Parse the wikiAddresses together with no content
+		var fullWikiAddress = parseAddress( getAddress, firsRevisionInfo);
+		// Using start date of Wikipedia, combined with the limit of 1 and rvdir=newer, will get the first revision
+		var findFirstWikiAddress = parseAddress( getAddress, "rvlimit=1&rvdir=newer&rvprop=ids|timestamp&rvstart=20010115000000&titles=");
+		// Wikipedia API will return latest revision when no info given
+		var findLastWikiAddress = parseAddress( getAddress, "rvlimit=1&rvprop=ids|timestamp&titles=");
+	}
 
 	// Get JSON object from given data: Find the first revision for the given article
 	$.ajax({
@@ -224,6 +254,7 @@ function findFirstRevision(getStartDate, getEndDate, getInterval, getAddress, sc
 		else {
 			// ERROR. No pages returned.
 			sendError("Wikipedia article was not found the first time.");
+			return;
 		}
 		// Loop over the one property of data.query.pages
 		for (var id in pages)
@@ -247,6 +278,7 @@ function findFirstRevision(getStartDate, getEndDate, getInterval, getAddress, sc
 				{
 					// If end date is before article creation: pass error
 					sendError("Wikipedia article did not exist during this time. Try a later end date.");
+					return;
 				}
 				// Check if user entered a start date before article existed
 				else if (firstRevisionDate >= startDateObj)
@@ -254,10 +286,15 @@ function findFirstRevision(getStartDate, getEndDate, getInterval, getAddress, sc
 					// If article creation is after selected start date, then the first revision is the first one we want
 					// Empty array for storing results
 					var contentArray = new Array();
-					// Fill array with initial revision: Get timestamp and content of current revision
+					// Fill array with initial revision's timestamp: timestamps are less prone to errors when using the Wikipedia API
 					contentArray.push(pages[id].revisions[0]["timestamp"]);
-					contentArray.push(pages[id].revisions[0]["user"]);
-					contentArray.push(pages[id].revisions[0]["*"]);
+					// Optimization: if more frequent request, get all content now
+					if (getInterval < 7)
+					{
+						// Fill array with initial revision: Get content of current revision
+						contentArray.push(pages[id].revisions[0]["user"]);
+						contentArray.push(pages[id].revisions[0]["*"]);
+					}
 
 					if(scrapeType == "date")
 					{
@@ -278,6 +315,7 @@ function findFirstRevision(getStartDate, getEndDate, getInterval, getAddress, sc
 					{
 						// ERROR. Unknown Scrape Type entered. Should never reach this error.
 						sendError("Unknown scrape type when searching for first revision.");
+						return;
 					}
 					// Go to recursive funtion with initial data
 					findNextRevision( firstRevisionTime, getInterval, getAddress, calcDate, endDateObj, contentArray, scrapeType);
@@ -303,6 +341,7 @@ function findFirstRevision(getStartDate, getEndDate, getInterval, getAddress, sc
 						else {
 							// ERROR. No pages returned.
 							sendError("Wikipedia article was not found a second time.");
+							return;
 						}
 						// Loop over the one property of data.query.pages
 						for (var id in pages)
@@ -325,10 +364,16 @@ function findFirstRevision(getStartDate, getEndDate, getInterval, getAddress, sc
 									{
 										// Empty array for storing results
 										var contentArray = new Array();
-										// Fill array with initial revision: Get timestamp and content of current revision
+										// Fill array with initial revision's timestamp
 										contentArray.push(pages[id].revisions[0]["timestamp"]);
-										contentArray.push(pages[id].revisions[0]["user"]);
-										contentArray.push(pages[id].revisions[0]["*"]);
+										// Optimization: if more frequent request, get all content now
+										if (getInterval < 7)
+										{
+											// Fill array with initial revision: Get content of current revision
+											contentArray.push(pages[id].revisions[0]["user"]);
+											contentArray.push(pages[id].revisions[0]["*"]);
+										}
+
 										// Calculate the next interval of time: Get the total miliseconds of the start date
 										var startMiliSec = Date.parse(startDateObj);
 										// Use those to calculate the next time we want to grab a revision
@@ -340,11 +385,13 @@ function findFirstRevision(getStartDate, getEndDate, getInterval, getAddress, sc
 									{
 										// No revisions were made during the given time period
 										sendError("No revisions were made during this time period. Try expanding the duration.");
+										return;
 									}
 									else
 									{
 										// ERROR. Unknown Scrape Type entered. Should never reach this error.
 										sendError("Unknown scrape type when searching for last revision.");
+										return;
 									}
 									// Go to recursive funtion with initial data
 									findNextRevision( lastRevisionTime, getInterval, getAddress, calcDate, endDateObj, contentArray, scrapeType);
@@ -370,6 +417,7 @@ function findFirstRevision(getStartDate, getEndDate, getInterval, getAddress, sc
 										else {
 											// ERROR. No pages returned.
 											sendError("Wikipedia article was not found.");
+											return;
 										}
 										// Loop over the one property of data.query.pages
 										for (var id in pages)
@@ -379,8 +427,12 @@ function findFirstRevision(getStartDate, getEndDate, getInterval, getAddress, sc
 												// Store specific revision's data for later use in next ajax call
 												var revTimeFirst = pages[id].revisions[0]["timestamp"];
 												var revIdFirst = pages[id].revisions[0]["revid"];
-												var revUserFirst = pages[id].revisions[0]["user"];
-												var revContentFirst = pages[id].revisions[0]["*"];
+												// Optimization: if more frequent request, also get content now
+												if (getInterval < 7)
+												{
+													var revUserFirst = pages[id].revisions[0]["user"];
+													var revContentFirst = pages[id].revisions[0]["*"];
+												}
 
 												// Change the timestamp of the specific revision to date format
 												// Given a string in the format: 2014-11-26..., parse and store as a date object
@@ -396,10 +448,15 @@ function findFirstRevision(getStartDate, getEndDate, getInterval, getAddress, sc
 												{
 													// Empty array for storing results
 													var contentArray = new Array();
-													// Fill array with initial revision: Get timestamp and content of current revision
+													// Fill array with initial revision's timestamp
 													contentArray.push(revTimeFirst);
-													contentArray.push(revUserFirst);
-													contentArray.push(revContentFirst);
+													// Optimization: if more frequent request, get all content now
+													if (getInterval < 7)
+													{
+														// Fill array with initial revision: Get content of current revision
+														contentArray.push(revUserFirst);
+														contentArray.push(revContentFirst);
+													}
 
 													if (scrapeType == "date")
 													{
@@ -419,15 +476,36 @@ function findFirstRevision(getStartDate, getEndDate, getInterval, getAddress, sc
 													{
 														// ERROR. Unknown Scrape Type entered. Should never reach this error.
 														sendError("Unknown scrape type when searching for first revision that should not exist.");
+														return;
 													}
 													// Go to recursive funtion with initial data
 													findNextRevision( revTimeFirst, getInterval, getAddress, calcDate,
 															endDateObj, contentArray, scrapeType);
 												}
 												else {
-													// Make the specific wiki address, includng the parent revision at index 1
-													var parentWikiAddress = findParentAddress(getAddress, revIdFirst);
-
+													/*
+													 *	Requests the id and timestamp of the revisions
+													 *	[0] - specific revision, [1] - parent of specific revision
+													 *	Uses a limit of 2, as that is all that is needed
+													 *	Uses the default of listing newest revisions first
+													 */
+													if (getInterval < 7)
+													{
+														var specificRequest = "rvlimit=2&rvprop=ids|timestamp|user|content&rvstartid="
+																			+ revIdFirst + "&titles=";
+														var parentWikiAddress = parseAddress(getAddress, specificRequest);
+													}
+													else
+													{
+														var specificRequest = "rvlimit=2&rvprop=ids|timestamp&rvstartid="
+																			+ revIdFirst + "&titles=";
+														var parentWikiAddress = parseAddress(getAddress, specificRequest);
+													}
+													/*	
+													 *	Need to find the parent of the specific revision, since that is the one we want
+													 *	Parent of the specific revision was the version of the article on the day we want
+													 */
+													// Get JSON object from given data
 													$.ajax({
 														dataType: "json",
 														type: "GET",
@@ -443,6 +521,7 @@ function findFirstRevision(getStartDate, getEndDate, getInterval, getAddress, sc
 														else {
 															// ERROR. No pages returned.
 															sendError("Wikipedia article was not found when looking for parent.");
+															return;
 														}
 														// Loop over the one property of data.query.pages
 														for (var id in pages)
@@ -474,11 +553,15 @@ function findFirstRevision(getStartDate, getEndDate, getInterval, getAddress, sc
 																{
 																	// Empty array for storing results
 																	var contentArray = new Array();
-																	// Fill array with initial revision:
-																	// Get timestamp and content of current revision
+																	// Fill array with parent revision's timestamp
 																	contentArray.push(pages[id].revisions[1]["timestamp"]);
-																	contentArray.push(pages[id].revisions[1]["user"]);
-																	contentArray.push(pages[id].revisions[1]["*"]);
+																	// Optimization: if more frequent request, get all content now
+																	if (getInterval < 7)
+																	{
+																		// Fill array with initial revision: Get content of current revision
+																		contentArray.push(pages[id].revisions[1]["user"]);
+																		contentArray.push(pages[id].revisions[1]["*"]);
+																	}
 
 																	if(scrapeType == "date")
 																	{
@@ -497,6 +580,7 @@ function findFirstRevision(getStartDate, getEndDate, getInterval, getAddress, sc
 																	{
 																		// ERROR. Unknown Scrape Type entered. Should never reach this error.
 																		sendError("Unknown scrape type when searching for parent revision.");
+																		return;
 																	}
 																	// Go to recursive funtion with initial data
 																	findNextRevision( parentRevisionTime, getInterval, getAddress, calcDate,
@@ -507,11 +591,15 @@ function findFirstRevision(getStartDate, getEndDate, getInterval, getAddress, sc
 																{
 																	// Empty array for storing results
 																	var contentArray = new Array();
-																	// Fill array with initial revision:
-																	// Get timestamp and content of current revision
+																	// Fill array with initial revision's timestamp
 																	contentArray.push(revTimeFirst);
-																	contentArray.push(revUserFirst);
-																	contentArray.push(revContentFirst);
+																	// Optimization: if more frequent request, get all content now
+																	if (getInterval < 7)
+																	{
+																		// Fill array with initial revision: Get content of current revision
+																		contentArray.push(revUserFirst);
+																		contentArray.push(revContentFirst);
+																	}
 
 																	if (scrapeType == "date")
 																	{
@@ -530,6 +618,7 @@ function findFirstRevision(getStartDate, getEndDate, getInterval, getAddress, sc
 																	{
 																		// ERROR. Unknown Scrape Type entered. Should never reach this error.
 																		sendError("Unknown scrape type when searching for specific revision.");
+																		return;
 																	}
 
 																	// Go to recursive funtion with initial data
@@ -540,6 +629,7 @@ function findFirstRevision(getStartDate, getEndDate, getInterval, getAddress, sc
 															else {
 																// ERROR. No revision content returned.
 																sendError("No revisions were found when using the parentid.");
+																return;
 															}
 														}
 													}).fail( function(xmlhttprequest, textstatus, message)
@@ -555,6 +645,7 @@ function findFirstRevision(getStartDate, getEndDate, getInterval, getAddress, sc
 											else {
 												// ERROR. No revision content returned.
 												sendError("No revisions were found.");
+												return;
 											}
 										}
 									}).fail( function(xmlhttprequest, textstatus, message)
@@ -570,6 +661,7 @@ function findFirstRevision(getStartDate, getEndDate, getInterval, getAddress, sc
 							else {
 								// ERROR. No revision content returned.
 								sendError("No final revisions were found.");
+								return;
 							}
 						}
 					}).fail( function(xmlhttprequest, textstatus, message)
@@ -585,6 +677,7 @@ function findFirstRevision(getStartDate, getEndDate, getInterval, getAddress, sc
 			else {
 				// ERROR. No revision content returned.
 				sendError("No early revisions were found.");
+				return;
 			}
 		}
 	}).fail( function(xmlhttprequest, textstatus, message)
@@ -608,8 +701,30 @@ function findNextRevision( revisionDate, intervalFreqency, gottenAddress, calcDa
 	// Progress bar update
 	updateProgressBar(calcDate, endDate);
 
-	// Parse the wikiAddress together
-	var wikiAddress = parseAddress(gottenAddress, revisionDate);
+	/*
+	 *	Build the Url to scrape: 
+	 *	Find the next entries, and grab the ones we need
+	 *	Uses max limit, which is currently 50 when requesting content, 500 when not
+	 */
+	// Optimization: get full content if frequency is under 7
+	if (intervalFreqency < 7)
+	{
+		// Parse the given date and remove all non-number characters
+		// Assuming: "timestamp":"2002-01-08T07:10:59Z" format
+		var specificRequest = "rvlimit=max&rvdir=newer&rvprop=ids|timestamp|user|content&rvstart=" +
+						revisionDate.replace(/[^0-9]/g,'') + "&titles=";
+
+		var wikiAddress = parseAddress(gottenAddress, specificRequest);
+	}
+	else
+	{
+		// Parse the given date and remove all non-number characters
+		// Assuming: "timestamp":"2002-01-08T07:10:59Z" format
+		var specificRequest = "rvlimit=max&rvdir=newer&rvprop=ids|timestamp&rvstart=" +
+						revisionDate.replace(/[^0-9]/g,'') + "&titles=";
+		// Requests the id and timestamp revisions to store in master list
+		var wikiAddress = parseAddress(gottenAddress, specificRequest);
+	}
 
 	// Get JSON object from given data
 	$.ajax({
@@ -627,6 +742,7 @@ function findNextRevision( revisionDate, intervalFreqency, gottenAddress, calcDa
 		else {
 			// ERROR. No pages returned.
 			sendError("Wikipedia article was not found the third time.");
+			return;
 		}
 		// Loop over the one property of data.query.pages
 		for (var id in pages)
@@ -651,8 +767,13 @@ function findNextRevision( revisionDate, intervalFreqency, gottenAddress, calcDa
 							{
 								// Store the current revision
 								contentArray.push(pages[id].revisions[i]["timestamp"]);
-								contentArray.push(pages[id].revisions[i]["user"]);
-								contentArray.push(pages[id].revisions[i]["*"]);
+								// Optimization: if more frequent request, get all content now
+								if (intervalFreqency < 7)
+								{
+									// Get content of current revision
+									contentArray.push(pages[id].revisions[i]["user"]);
+									contentArray.push(pages[id].revisions[i]["*"]);
+								}
 
 								// Store the revison timestamp as the last chosen revison timestamp
 								revisionDate = pages[id].revisions[i]["timestamp"];
@@ -664,8 +785,21 @@ function findNextRevision( revisionDate, intervalFreqency, gottenAddress, calcDa
 							// If past endDate, return.
 							if( endDate < calcDate)
 							{
-								finalContent(contentArray, gottenAddress);
-								return;
+								// Optimization: if have been getting all content go straight to finalContent
+								if (intervalFreqency < 7)
+								{
+									finalContent(contentArray, gottenAddress);
+									return;
+								}
+								else {
+									// Update the first progress bar to 100%
+									$('#progressBarAll').width('100%');
+									// Empty array for storing final content
+									var finalArray = new Array();
+									// Need to build content from array of timestamps
+									buildContent(finalArray, contentArray, gottenAddress, contentArray.length);
+									return;
+								}
 							}
 						}
 						// If the current revision is the last revision and only revision
@@ -677,8 +811,13 @@ function findNextRevision( revisionDate, intervalFreqency, gottenAddress, calcDa
 							{
 								// Store the current revision
 								contentArray.push(pages[id].revisions[i]["timestamp"]);
-								contentArray.push(pages[id].revisions[i]["user"]);
-								contentArray.push(pages[id].revisions[i]["*"]);
+								// Optimization: if more frequent request, get all content now
+								if (intervalFreqency < 7)
+								{
+									// Get content of current revision
+									contentArray.push(pages[id].revisions[i]["user"]);
+									contentArray.push(pages[id].revisions[i]["*"]);
+								}
 
 								// Store the revison timestamp as the last chosen revison timestamp
 								revisionDate = pages[id].revisions[i]["timestamp"];
@@ -690,8 +829,21 @@ function findNextRevision( revisionDate, intervalFreqency, gottenAddress, calcDa
 							// If past endDate, return.
 							if( endDate < calcDate)
 							{
-								finalContent(contentArray, gottenAddress);
-								return;
+								// Optimization: if have been getting all content go straight to finalContent
+								if (intervalFreqency < 7)
+								{
+									finalContent(contentArray, gottenAddress);
+									return;
+								}
+								else {
+									// Update the first progress bar to 100%
+									$('#progressBarAll').width('100%');
+									// Empty array for storing final content
+									var finalArray = new Array();
+									// Need to build content from array of timestamps
+									buildContent(finalArray, contentArray, gottenAddress, contentArray.length);
+									return;
+								}
 							}
 						}
 						// If the current revision is the last revision of the json object
@@ -699,7 +851,7 @@ function findNextRevision( revisionDate, intervalFreqency, gottenAddress, calcDa
 						{
 							// Store the revison timestamp as the last chosen revison timestamp
 							revisionDate = pages[id].revisions[i]["timestamp"];
-							// Do a recursive call and merge with content array starting with last revision id
+							// Do a recursive call and merge with content array
 							findNextRevision( revisionDate, intervalFreqency, gottenAddress, calcDate, endDate, contentArray, scrapeType);
 							return;
 						}
@@ -707,6 +859,7 @@ function findNextRevision( revisionDate, intervalFreqency, gottenAddress, calcDa
 						{
 							// ERROR. Something went very wrong.
 							sendError("Non-existent revision encountered.");
+							return;
 						}
 					}
 				}
@@ -715,8 +868,21 @@ function findNextRevision( revisionDate, intervalFreqency, gottenAddress, calcDa
 					// Check if the number of revisions returned is less than the interval
 					if( (pages[id].revisions.length -1) < parseInt(intervalFreqency, 10) )
 					{
-						finalContent(contentArray, gottenAddress);
-						return;
+						// Optimization: if have been getting all content go straight to finalContent
+						if (intervalFreqency < 7)
+						{
+							finalContent(contentArray, gottenAddress);
+							return;
+						}
+						else {
+							// Update the first progress bar to 100%
+							$('#progressBarAll').width('100%');
+							// Empty array for storing final content
+							var finalArray = new Array();
+							// Need to build content from array of timestamps
+							buildContent(finalArray, contentArray, gottenAddress, contentArray.length);
+							return;
+						}
 					}
 					else if( (pages[id].revisions.length -1) >= parseInt(intervalFreqency, 10) )
 					{
@@ -731,13 +897,31 @@ function findNextRevision( revisionDate, intervalFreqency, gottenAddress, calcDa
 							// If current revision's date is after endDate, return.
 							if( endDate < thisRevisionDate)
 							{
-								finalContent(contentArray, gottenAddress);
-								return;
+								// Optimization: if have been getting all content go straight to finalContent
+								if (intervalFreqency < 7)
+								{
+									finalContent(contentArray, gottenAddress);
+									return;
+								}
+								else {
+									// Update the first progress bar to 100%
+									$('#progressBarAll').width('100%');
+									// Empty array for storing final content
+									var finalArray = new Array();
+									// Need to build content from array of timestamps
+									buildContent(finalArray, contentArray, gottenAddress, contentArray.length);
+									return;
+								}
 							}
 							// Store the current revision
 							contentArray.push(pages[id].revisions[i]["timestamp"]);
-							contentArray.push(pages[id].revisions[i]["user"]);
-							contentArray.push(pages[id].revisions[i]["*"]);
+							// Optimization: if more frequent request, get all content now
+							if (intervalFreqency < 7)
+							{
+								// Get content of current revision
+								contentArray.push(pages[id].revisions[i]["user"]);
+								contentArray.push(pages[id].revisions[i]["*"]);
+							}
 
 							// Store the revison timestamp as the last chosen revison timestamp
 							revisionDate = pages[id].revisions[i]["timestamp"];
@@ -750,17 +934,20 @@ function findNextRevision( revisionDate, intervalFreqency, gottenAddress, calcDa
 					{
 						// ERROR. Something went very, very wrong. Should never reach this error.
 						sendError("Incompatible interval and array length type.");
+						return;
 					}
 				}
 				else
 				{
 					// ERROR. Unknown Scrape Type entered. Should never reach this error.
 					sendError("Unknown scrape type when searching for revisions.");
+					return;
 				}
 			}
 			else {
 				// ERROR. No revision content returned.
 				sendError("Recursive look for revisions could not find any.");
+				return;
 			}
 		}
 	}).fail( function(xmlhttprequest, textstatus, message)
@@ -776,12 +963,115 @@ function findNextRevision( revisionDate, intervalFreqency, gottenAddress, calcDa
 
 /*
  *	Called from findNextRevision
+ *	Find the content for each of the timestamps in the contentArray
+ */
+function buildContent(finalArray, contentArray, gottenAddress, totalRevisions)
+{
+	// Update progress bar using the length of what is left in the array to be found
+	$('#progressBarContent').width( (100 - ((contentArray.length/totalRevisions)*100)) + '%');
+
+	// If contentArray is not empty
+	if (contentArray.length > 0)
+	{
+		// Pop the first item of contentArray and put it into revisionTime
+		var revisionTime = contentArray.shift();
+	}
+	else
+	{
+		// contentArray is empty, we are done and go to finalContent function for printing out
+		finalContent(finalArray, gottenAddress);
+		return;
+	}
+
+	/*
+	 *	Parse the address together: requests data for a single revision
+	 *	Uses a limit of one to speed up request and since we are looking for a specific revision
+	 *	Uses the default of listing newest revisions first.
+	 *	Parse the given date and remove all non-number characters
+	 *	Assuming: "timestamp":"2002-01-08T07:10:59Z" format
+	 */
+	var specificRequest = "rvlimit=1&rvprop=ids|timestamp|user|content&rvstart=" + revisionTime.replace(/[^0-9]/g,'') + "&titles=";
+	var specificAddress = parseAddress(gottenAddress, specificRequest);
+
+	// Get JSON object from given data
+	$.ajax({
+		dataType: "json",
+		type: "GET",
+		url: specificAddress,
+		timeout: 60000
+	}).then ( function(data)
+	{
+		// Check if the data we expect exists
+		if (data && data.query && data.query.pages) {
+			// Cut through the nested json object
+			var pages = data.query.pages;
+		}
+		else {
+			// ERROR. No pages returned.
+			sendError("Wikipedia article was not found when searching for a specific revision.");
+			return;
+		}
+		// Loop over the one property of data.query.pages
+		for (var id in pages)
+		{
+			if (pages[id].revisions && pages[id].revisions[0] && pages[id].revisions[0]["revid"])
+			{
+				// Store the current revision
+				finalArray.push(pages[id].revisions[0]["timestamp"]);
+				finalArray.push(pages[id].revisions[0]["user"]);
+				finalArray.push(pages[id].revisions[0]["*"]);
+
+				// While contentArray is not empty and last stored revision has the same id as the next one
+				while ( (pages[id].revisions[0]["revid"] == contentArray[0]) && (contentArray.length > 0) )
+				{
+					// Store the current revision as it is the same as the next one
+					finalArray.push(pages[id].revisions[0]["timestamp"]);
+					finalArray.push(pages[id].revisions[0]["user"]);
+					finalArray.push(pages[id].revisions[0]["*"]);
+
+					// Remove the first item of contentArray
+					contentArray.shift();
+				}
+
+				// If contentArray is empty
+				if (contentArray.length <= 0)
+				{
+					// contentArray is empty, we are done and go to finalContent function for printing out
+					finalContent(finalArray, gottenAddress);
+					return;
+				}
+
+				// Recursive call with edited data
+				buildContent(finalArray, contentArray, gottenAddress, totalRevisions);
+				return;
+			}
+			else {
+				// ERROR. No revision content returned.
+				sendError("Second recursive look for revisions could not find any.");
+				return;
+			}
+		}
+	}).fail( function(xmlhttprequest, textstatus, message)
+	{
+		if(textstatus == "timeout") {
+			sendError("Last revision request to Wikipedia timed out.");
+		} else {
+			sendError(textstatus);
+		}
+	});
+}
+
+
+/*
+ *	Called from buildContent or findNextRevision
  *	Make content readable and print to screen
  */
 function finalContent(contentArray, gottenAddress)
 {
-	// Update the progress bar to 100%
-	$('#progressBar').width('100%');
+	// Update the first progress bar to 100%
+	$('#progressBarAll').width('100%');
+	// Update the second progress bar to 100%
+	$('#progressBarContent').width('100%');
 
 	// Get title of article from URL part
 	var addressArray = gottenAddress.split("/");
@@ -805,6 +1095,7 @@ function finalContent(contentArray, gottenAddress)
 	{
 		// ERROR. Unknown Scrape Type entered. Should never reach this error.
 		sendError("Unknown scrape type printing final results.");
+		return;
 	}
 
 	// Get the format the user wants
@@ -829,6 +1120,7 @@ function finalContent(contentArray, gottenAddress)
 	else {
 		// Error
 		sendError("There was an error when formatting the output. An unknown request was entered.");
+		return;
 	}
 
 	// Allow user to select the recently printed text
@@ -838,8 +1130,9 @@ function finalContent(contentArray, gottenAddress)
 
 	//Re-enable the form for editing
 	enableForm();
-	// Hide the progress bar after 800 miliseconds
-	setTimeout( function(){ $("#progressBarWrapper").slideUp(460)}, 800);
+	// Hide the progress bars after 800 miliseconds
+	setTimeout( function(){ $("#progressBarAllWrapper").slideUp(460)}, 800);
+	setTimeout( function(){ $("#progressBarContentWrapper").slideUp(460)}, 800);
 }
 
 
@@ -985,96 +1278,39 @@ function parseString( wikiContent)
 
 
 /*
- *	Called from findFirstRevision
+ *	Called from findFirstRevision, buildContent, findNextRevision
  *	
- *	Parse the wiki address together in json format
- *	Uses a limit of two to speed up initial request
+ *	Parse the wiki address together in json format using the information given
+ *
+ *	When requesting revisions by id, asking for rvdir=newer returns the very first revisions of that article
+ *		and does not start at the specified rvstartid. When listing by id, some articles have a first revision
+ *		with a parent id (rather than zero) and causes errors when requesting a specific revision, so
+ *		timestamps are used instead.
  *
  *	Wikipedia Address Variables
  *	http://en.wikipedia.org/w/api.php?format=json&action=query&prop=revisions&callback=?
  *		&rvlimit=max&rvdir=newer&rvprop=ids|timestamp|user|content
  *		&rvstart=20141026000000&rvend=20141029000000&titles=Ada_Lovelace
  *	callback=? is for making sure a response comes. (JSONP)
- *	rvlimit=max is the maximum number of revisions to return.
- *		Use the string "max" to return all revisions
+ *	rvlimit=max requests the maximum number of revisions to be returned.
  *	rvdir=newer is the direction to list in.
  *		newer: List oldest revisions first (rvstart has to be lower than rvend)
  *	rvprop=ids|timestamp|user|content is which properties to get for each revision
  *		ids: Get both of these IDs: revid, parentid
  *		timestamp: The date and time the revision was made
  *		user: The user who made the revision, as well as userhidden and anon flags
- *		content: The revision content. If set, the maximum limit will be 10 times as low
+ *		content: The revision content.
  *	rvstart=yyyymmdd000000 is the date to start looking at. Needs to be earlier than rvend.
  *	rvend=yyyymmdd000000 is the date to stop looking at. Needs to be later than rvend.
  */
-function parseInitialAddress( gottenAddress, rawStartDate, rawEndDate)
-{
-	// Standard URL parts for scraping
-	var wikiAddressOne = "http://";
-	var wikiAddressThree = ".wikipedia.org/w/api.php?format=json&action=query&prop=revisions" +
-							"&callback=?&rvlimit=2&rvdir=newer&rvprop=ids|timestamp|user|content&rvstart=";
-	var wikiAddressFive = "&rvend="
-	var wikiAddressSeven = "&titles=";
-
-	// Parse language and title from gotten address
-	// Assuming a certain form of URL. Example:
-	/*	http://en.wikipedia.org/wiki/Ada_Lovelace
-	 *	[0] = http:
-	 *	[1] = 
-	 *	[2] = en.wikipedia.org
-	 *	[3] = wiki
-	 *	[4] = Ada_Lovelace
-	 */
-	var addressArray = gottenAddress.split("/");
-	var tempLanguage = addressArray[2];
-	var languageArray = tempLanguage.split(".");
-
-	// Assign language and title variables
-	var wikiAddressTitleEight = addressArray[4];
-	var wikiAddressLangTwo = languageArray[0];
-
-	// Remove the '/' from the raw dates
-	rawStartDate = rawStartDate.replace(/\//g, '');
-	rawEndDate = rawEndDate.replace(/\//g, '');
-	// Add six zeros on the end
-	rawStartDate += "000000";
-	rawEndDate += "000000";
-
-	var wikiAddressDateFour = rawStartDate;
-	var wikiAddressDateSix = rawEndDate;
-
-	// Concat the address together
-	var fullWikiAddress = wikiAddressOne.concat( wikiAddressLangTwo, wikiAddressThree,
-			wikiAddressDateFour, wikiAddressFive, wikiAddressDateSix, wikiAddressSeven,
-			wikiAddressTitleEight);
-
-	// return the full address
-	return fullWikiAddress;
-}
-
-
-/*
- *	Called from findFirstRevision
- *	Parse the wiki address together in json format using the information given
- *	Finds the very first revision of the article requested
- *	Uses a limit of one to speed up request
- */
-function findVeryFirstRevision(gottenAddress)
+function parseAddress(gottenAddress, specificRequest)
 {
 	/*
 	 *	Build the Url to scrape
-	 *	Start day is the start date of Wikipedia
-	 *	Combined with the limit of 1 and rvdir=newer, will get the first revision
 	 */
 	// Standard URL parts for scraping
 	var wikiAddressOne = "http://";
-	var wikiAddressThree = ".wikipedia.org/w/api.php?format=json&action=query&prop=revisions" +
-							"&callback=?&rvlimit=1&rvdir=newer&rvprop=ids|timestamp|user|content&rvstart=20010115000000&rvend="
-	var wikiAddressFive = "&titles=";
-
-	// Get todays date
-	var d = new Date();
-	var wikiAddressDateFour = d.getFullYear() + ("0" + (d.getMonth() + 1)).slice(-2) + ("0" + d.getDate()).slice(-2) + "000000";
+	var wikiAddressThree = ".wikipedia.org/w/api.php?format=json&action=query&prop=revisions&callback=?&";
 
 	// Parse language and title from gotten address
 	// Assuming a certain form of URL. Example:
@@ -1095,146 +1331,8 @@ function findVeryFirstRevision(gottenAddress)
 
 	// Concat the address together
 	var tempWikiAddress = wikiAddressOne.concat( wikiAddressLangTwo, wikiAddressThree,
-				wikiAddressDateFour, wikiAddressFive, wikiAddressTitleSix);
-	
-	// return the full address
-	return tempWikiAddress;
-}
+				specificRequest, wikiAddressTitleSix);
 
-
-/*
- *	Called from findFirstRevision
- *	Parse the wiki address together in json format using the information given
- *	Finds the very last revision of the article requested
- *	Uses a limit of one to speed up request
- */
-function findVeryLastRevision(gottenAddress)
-{
-	/*
-	 *	Build the Url to scrape
-	 *	Wikipedia API will return latest revision when no info given
-	 */
-	// Standard URL parts for scraping
-	var wikiAddressOne = "http://";
-	var wikiAddressThree = ".wikipedia.org/w/api.php?format=json&action=query&prop=revisions" +
-							"&callback=?&rvlimit=1&rvprop=ids|timestamp|user|content&titles=";
-
-	// Parse language and title from gotten address
-	// Assuming a certain form of URL. Example:
-	/*	http://en.wikipedia.org/wiki/Ada_Lovelace
-	 *	[0] = http:
-	 *	[1] = 
-	 *	[2] = en.wikipedia.org
-	 *	[3] = wiki
-	 *	[4] = Ada_Lovelace
-	 */
-	var addressArray = gottenAddress.split("/");
-	var tempLanguage = addressArray[2];
-	var languageArray = tempLanguage.split(".");
-
-	// Assign language and title variables
-	var wikiAddressTitleFour = addressArray[4];
-	var wikiAddressLangTwo = languageArray[0];
-
-	// Concat the address together
-	var tempWikiAddress = wikiAddressOne.concat( wikiAddressLangTwo, wikiAddressThree, wikiAddressTitleFour);
-
-	// return the full address
-	return tempWikiAddress;
-}
-
-
-/*
- *	Called from findFirstRevision
- *	Parse the wiki address together in json format using the information given
- *	Requests the id, timestamp, user and full content of the revisions
- *	Uses a limit of 2, as that is all that is needed.
- */
-function findParentAddress(gottenAddress, revisionId)
-{
-	/*
-	 *	Build the Url to scrape: 
-	 *	Pass in the specific revision and the content of te specific revision and it's parent will be returned.
-	 *	[0] - specific revision, [1] - parent of specific revision
-	 *	Uses the default of listing newest revisions first.
-	 *	When requesting revisions by id, asking for rvdir=newer returns the very first revisions of that article
-	 *		and does not start at the specified rvstartid. 
-	 */
-	// Standard URL parts for scraping
-	var wikiAddressOne = "http://";
-	var wikiAddressThree = ".wikipedia.org/w/api.php?format=json&action=query&prop=revisions" +
-							"&callback=?&rvlimit=2&rvprop=ids|timestamp|user|content&rvstartid=";
-	var wikiAddressFive = "&titles=";
-
-	// Parse language and title from gotten address
-	// Assuming a certain form of URL. Example:
-	/*	http://en.wikipedia.org/wiki/Ada_Lovelace
-	 *	[0] = http:
-	 *	[1] = 
-	 *	[2] = en.wikipedia.org
-	 *	[3] = wiki
-	 *	[4] = Ada_Lovelace
-	 */
-	var addressArray = gottenAddress.split("/");
-	var tempLanguage = addressArray[2];
-	var languageArray = tempLanguage.split(".");
-
-	// Assign language and title variables
-	var wikiAddressTitleSix = addressArray[4];
-	var wikiAddressLangTwo = languageArray[0];
-
-	// Concat the address together
-	var tempWikiAddress = wikiAddressOne.concat( wikiAddressLangTwo, wikiAddressThree,
-				revisionId, wikiAddressFive, wikiAddressTitleSix);
-	
-	// return the full address
-	return tempWikiAddress;
-}
-
-
-/*
- *	Called from findNextRevision
- *	Parse the wiki address together in json format using the information given
- *	Requests the id, timestamp, user and full content of the revisions
- *	Uses max limit, which is currently 50
- */
-function parseAddress(gottenAddress, revisionDate)
-{
-	/*
-	 *	Build the Url to scrape: 
-	 *	Find the next entries, and grab the ones we need	
-	 */
-	// Standard URL parts for scraping
-	var wikiAddressOne = "http://";
-	var wikiAddressThree = ".wikipedia.org/w/api.php?format=json&action=query&prop=revisions" +
-							"&callback=?&rvlimit=max&rvdir=newer&rvprop=ids|timestamp|user|content&rvstart=";
-	var wikiAddressFive = "&titles=";
-
-	// Parse the given date and remove all non-number characters
-	// Assuming: "timestamp":"2002-01-08T07:10:59Z" format
-	var wikiAddressDateFour = revisionDate.replace(/[^0-9]/g,'');
-
-	// Parse language and title from gotten address
-	// Assuming a certain form of URL. Example:
-	/*	http://en.wikipedia.org/wiki/Ada_Lovelace
-	 *	[0] = http:
-	 *	[1] = 
-	 *	[2] = en.wikipedia.org
-	 *	[3] = wiki
-	 *	[4] = Ada_Lovelace
-	 */
-	var addressArray = gottenAddress.split("/");
-	var tempLanguage = addressArray[2];
-	var languageArray = tempLanguage.split(".");
-
-	// Assign language and title variables
-	var wikiAddressTitleSix = addressArray[4];
-	var wikiAddressLangTwo = languageArray[0];
-
-	// Concat the address together
-	var tempWikiAddress = wikiAddressOne.concat( wikiAddressLangTwo, wikiAddressThree,
-				wikiAddressDateFour, wikiAddressFive, wikiAddressTitleSix);
-	
 	// return the full address
 	return tempWikiAddress;
 }
@@ -1395,6 +1493,7 @@ function updatePreview()
 	else {
 		// Error occured. Should never reach this error
 		sendError("Could not obtain Wikipedia address.");
+		return;
 	}
 }
 
@@ -1425,7 +1524,7 @@ function updateProgressBar(currentDate, endDate)
 	var calcPercent = (currentMiliSec / endMiliSec) * 100;
 
 	// Update progress bar
-	$('#progressBar').width(calcPercent + '%');
+	$('#progressBarAll').width(calcPercent + '%');
 }
 
 
@@ -1452,8 +1551,9 @@ function resetForm()
 	$('#errorOutputAlert').slideUp(460);
 	// Use validateInfo to remove all error messages
 	validateInfo();
-	// Hide the progress bar
-	$("#progressBarWrapper").slideUp(460);
+	// Hide the progress bars
+	$("#progressBarAllWrapper").slideUp(460);
+	$("#progressBarContentWrapper").slideUp(460);
 }
 
 
