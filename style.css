@@ -81,6 +81,10 @@ body {
 	display: none;
 }
 
+#buttonsDiv {
+	text-align: center;
+}
+
 /* 
  *	Classes
  *	Contains position and decoration

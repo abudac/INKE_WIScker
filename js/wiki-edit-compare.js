@@ -37,8 +37,9 @@ $(document).ready(function () {
 
 	// Empty the output section
 	$('#printOutHere').text('');
-	// Disable the select output text button
+	// Disable the select output text button and the send to voyant button
 	$('#selectTextButton').prop('disabled', true);
+	$('#sendToVoyantButton').prop('disabled', true);
 	// Enable reset button
 	$('#resetButton').prop('disabled', false);
 
@@ -1123,8 +1124,9 @@ function finalContent(contentArray, gottenAddress)
 		return;
 	}
 
-	// Allow user to select the recently printed text
+	// Allow user to select the recently printed text or send it to Voyant
 	$('#selectTextButton').prop('disabled', false);
+	$('#sendToVoyantButton').prop('disabled', false);
 	// Enable Reset button
 	$('#resetButton').prop('disabled', false);
 
@@ -1540,8 +1542,9 @@ function resetForm()
 	$("#wikiForm").trigger('reset');
 	// Empty the output section
 	$('#printOutHere').text('');
-	// Disable the select output text button
+	// Disable the select output text button and the send to voyant button
 	$('#selectTextButton').prop('disabled', true);
+	$('#sendToVoyantButton').prop('disabled', true);
 	// Make sure date panel is visible
 	$("#datePanel").slideDown(460);
 	$("#frequencyPanel").slideUp(460);
@@ -1582,8 +1585,9 @@ function disableForm()
 	$('.form-control').prop('disabled', true);
 	$('#scrapeTypeRadio1').prop('disabled', true);
 	$('#scrapeTypeRadio2').prop('disabled', true);
-	// Disable the select output text button
+	// Disable the select output text button and the send to voyant button
 	$('#selectTextButton').prop('disabled', true);
+	$('#sendToVoyantButton').prop('disabled', true);
 	// Disable submit button
 	$('#submitButton').prop('disabled', true);
 	// Disable Reset button
@@ -1621,6 +1625,22 @@ function selectAllText(containerid)
 		range.selectNode(document.getElementById(containerid));
 		window.getSelection().addRange(range);
 	}
+}
+
+/*
+ *	Send the resulting text to Voyant Tools
+ *	Don't use jQuery since the asset is loaded as a local file that's not included here
+ */
+function sendEscpapedToVoyant(id)
+{
+	// Grab the Escaped Content from the Specified ID
+	var content = document.getElementById(id).innerHTML;
+	// Unescape
+	content = content.replace(/<br>/g, "\n").replace(/&lt;/g,"<").replace(/&gt;/g,">").replace(/&nbsp;/g, " ");
+	// Set Form Value
+	document.getElementById('sendToVoyantContent').value = content;
+	// Submit Form
+	document.getElementById('sendToVoyantForm').submit();
 }
 
 
