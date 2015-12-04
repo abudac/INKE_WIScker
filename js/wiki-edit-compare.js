@@ -1631,16 +1631,16 @@ function selectAllText(containerid)
  *	Send the resulting text to Voyant Tools
  *	Don't use jQuery since the asset is loaded as a local file that's not included here
  */
-function sendEscpapedToVoyant(id)
+function sendEscpapedToVoyant()
 {
 	// Grab the Escaped Content from the Specified ID
-	var content = document.getElementById(id).innerHTML;
+	var content = document.getElementById("printOutHere").innerHTML;
 	// Unescape
 	content = content.replace(/<br>/g, "\n").replace(/&lt;/g,"<").replace(/&gt;/g,">").replace(/&nbsp;/g, " ");
 	// Set Form Value
 	document.getElementById('sendToVoyantContent').value = content;
 	// Submit Form
-	document.getElementById('sendToVoyantForm').submit();
+	return true;
 }
 
 
