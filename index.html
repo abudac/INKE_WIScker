@@ -14,7 +14,7 @@
 <!-- WIScker (Wikipedia Idea Scraper) is a tool for scraping old revisions of Wikipedia articles.    -->
 <!-- The corpus resulting from the scrape is then available to the user to analyze as they see fit. -->
 <!-- 																								-->
-<!-- Copyright (C) 2014-2015  Andrea Budac and INKE													-->
+<!-- Copyright (C) 2014-2017  Andrea Budac and INKE													-->
 <!-- 																								-->
 <!-- This program is free software: you can redistribute it and/or modify 							-->
 <!-- it under the terms of the GNU General Public License as published by 							-->
@@ -30,7 +30,7 @@
 <!-- along with this program.  If not, see <http://www.gnu.org/licenses/>.							-->
 <!-- ============================================================================================== -->
 	<!-- CSS loaded from style.css -->
-	<link rel="stylesheet" type="text/css" href="style.css">
+	<link rel="stylesheet" type="text/css" href="css/style.css">
 	<!-- Bootstrap CSS -->
 	<link rel="stylesheet" href="css/bootstrap.min.css" media="screen">
 	<link rel="stylesheet" href="css/datepicker.css">
@@ -72,7 +72,7 @@
 		The scraping type determines how often you want to collect revisions.
 	</p><p>
 		Once the form is filled, press the "Scrape" button and WIScker will print the corpus below the Wikipedia window.
-		To copy the resulting text, press the "Select Text" button and the copy it into whatever software you wish to use to analyze it. Another option is to press the "Send to Voyant" button, which will automatically upload the corpus to <a href="http://beta.voyant-tools.org/">Voyant Tools</a> and open a new tab. For best results, use xml when sending to Voyant.
+		To copy the resulting text, press the "Select Text" button and the copy it into whatever software you wish to use to analyze it. Another option is to press the "Send to Voyant" button, which will automatically upload the corpus to <a href="http://voyant-tools.org/">Voyant Tools</a> and open a new tab. For best results, use xml when sending to Voyant.
 		The "Reset" button clears the form and the output section.
 	</p>
 </section>
@@ -98,7 +98,7 @@
 			<!-- Text box for address of Wikipedia article -->
 			<div class="form-group" id="wikiAddressBox">
 				<label>Enter the URL of the Wikipedia article you want to scrape:</label>
-				<input type="text" class="form-control" id="wikiAddress" placeholder="http://en.wikipedia.org/"
+				<input type="text" class="form-control" id="wikiAddress" placeholder="https://en.wikipedia.org/"
 					data-toggle="popover"
 					onchange=validateInfo(); oninput=validateInfo();>
 			</div>
@@ -188,7 +188,7 @@
 			<button type="button" class="btn btn-warning" id="resetButton" onclick=resetForm();>Reset</button>
 			<button type="button" class="btn btn-info" id="selectTextButton" onclick=selectAllText('printOutHere');>Select Text</button>
 			<!-- Post the content to Voyant, it will take care of handing the content and redirecting to the new corpus -->
-			<form id="sendToVoyantForm" action="http://beta.voyant-tools.org" method="POST" target="_blank" onsubmit='return sendEscpapedToVoyant();'>
+			<form id="sendToVoyantForm" action="http://voyant-tools.org" method="POST" target="_blank" onsubmit='return sendEscpapedToVoyant();'>
 				<input type="hidden" id="sendToVoyantContent" name="input" value="" />
 				<input type="hidden" name="xmlDocumentsXpath" value="//version"/>
 				<input type="hidden" name="xmlAuthorXpath" value="//author"/>
@@ -201,7 +201,8 @@
 	<section class="wikiOutputRight">
 		<!-- Page Preview -->
 		<div id="previewBox">
-			<iframe src="http://en.wikipedia.org/" id="previewFrame" sandbox=""></iframe>
+			<iframe sandbox="allow-same-origin allow-scripts allow-forms"
+					src="https://en.wikipedia.org/" id="previewFrame"></iframe>
 		</div>
 		<!-- Print Output Here -->
 		<div class="alert alert-danger alert-dismissible fade in" id="errorOutputAlert">

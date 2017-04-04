@@ -7,7 +7,7 @@
  *	WIScker (Wikipedia Idea Scraper) is a tool for scraping old revisions of Wikipedia articles.
  *	The corpus resulting from the scrape is then available to the user to analyze as they see fit.
  *	
- *	Copyright (C) 2014-2015  Andrea Budac and INKE
+ *	Copyright (C) 2014-2017  Andrea Budac and INKE
  *	
  *	This program is free software: you can redistribute it and/or modify
  *	it under the terms of the GNU General Public License as published by
